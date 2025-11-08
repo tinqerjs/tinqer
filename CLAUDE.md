@@ -51,7 +51,7 @@ This applies to ANY question, even if it seems like part of a larger task or dis
 
 **NEVER use the MultiEdit tool.** It has caused issues in multiple projects. Always use individual Edit operations instead, even if it means more edits. This ensures better control and prevents unintended changes.
 
-### ⚠️ NEVER USE AUTOMATED SCRIPTS FOR FIXES ⚠️
+### NEVER USE AUTOMATED SCRIPTS FOR FIXES
 
 **🚨 CRITICAL RULE: NEVER EVER attempt automated fixes via scripts or mass updates. 🚨**
 
@@ -73,7 +73,298 @@ This is a **MANDATORY** requirement that you **MUST NEVER** violate:
 - Manual edits ensure accuracy and preserve context
 - You WILL mess up the code if you violate this rule
 
-This ensures accuracy and prevents cascading errors from incorrect pattern matching.
+## GIT SAFETY RULES
+
+### NEVER DISCARD UNCOMMITTED WORK
+
+**🚨 CRITICAL RULE: NEVER use commands that permanently delete uncommitted changes. 🚨**
+
+These commands cause **PERMANENT DATA LOSS** that cannot be recovered:
+
+- **NEVER** use `git reset --hard`
+- **NEVER** use `git reset --soft`
+- **NEVER** use `git reset --mixed`
+- **NEVER** use `git reset HEAD`
+- **NEVER** use `git checkout -- .`
+- **NEVER** use `git checkout -- <file>`
+- **NEVER** use `git restore` to discard changes
+- **NEVER** use `git clean -fd`
+
+**Why this matters for AI sessions:**
+
+- Uncommitted work is invisible to future AI sessions
+- Once discarded, changes cannot be recovered
+- AI cannot help fix problems it cannot see
+
+**What to do instead:**
+
+| Situation               | ❌ WRONG                            | ✅ CORRECT                         |
+| ----------------------- | ----------------------------------- | ---------------------------------- |
+| Need to switch branches | `git checkout main` (loses changes) | Commit first, then switch          |
+| Made mistakes           | `git reset --hard`                  | Commit to temp branch, start fresh |
+| Want clean slate        | `git restore .`                     | Commit current state, then revert  |
+| On wrong branch         | `git checkout --`                   | Commit here, then cherry-pick      |
+
+**Safe workflow:**
+
+```bash
+# Always commit before switching context
+git add -A
+git commit -m "wip: current progress on feature X"
+git checkout other-branch
+
+# If commit was wrong, fix with new commit or revert
+git revert HEAD  # Creates new commit that undoes last commit
+# OR
+git commit -m "fix: correct the previous commit"
+```
+
+### NEVER USE GIT STASH
+
+**🚨 CRITICAL RULE: NEVER use git stash - it hides work and causes data loss. 🚨**
+
+- **NEVER** use `git stash`
+- **NEVER** use `git stash push`
+- **NEVER** use `git stash pop`
+- **NEVER** use `git stash apply`
+- **NEVER** use `git stash drop`
+
+**Why stash is dangerous:**
+
+- Stashed changes are invisible to AI sessions
+- Easy to forget what's stashed
+- Stash can be accidentally dropped
+- Causes merge conflicts when applied
+- No clear history of when/why stashed
+
+**What to do instead - Use WIP branches:**
+
+```bash
+# Instead of stash, create a timestamped WIP branch
+git checkout -b wip/feature-name-$(date +%Y%m%d-%H%M%S)
+git add -A
+git commit -m "wip: in-progress work on feature X"
+git push -u origin wip/feature-name-$(date +%Y%m%d-%H%M%S)
+
+# Now switch to other work safely
+git checkout main
+# ... do other work ...
+
+# Return to your WIP later
+git checkout wip/feature-name-20251108-084530
+# Continue working...
+
+# When done, squash WIP commits or rebase
+git rebase -i main
+```
+
+**Benefits of WIP branches over stash:**
+
+- ✅ Work is visible in git history
+- ✅ Work is backed up on remote
+- ✅ AI can see the work in future sessions
+- ✅ Can have multiple WIP branches
+- ✅ Clear timestamps show when work was done
+- ✅ Can share WIP with others if needed
+
+### Safe Branch Switching
+
+**ALWAYS commit before switching branches:**
+
+```bash
+# Check current status
+git status
+
+# If there are changes, commit them first
+git add -A
+git commit -m "wip: current state before switching"
+
+# NOW safe to switch
+git checkout other-branch
+```
+
+**If you accidentally started work on wrong branch:**
+
+```bash
+# DON'T use git reset or git checkout --
+# Instead, commit the work here
+git add -A
+git commit -m "wip: work started on wrong branch"
+
+# Create correct branch from current state
+git checkout -b correct-branch-name
+
+# Previous branch will still have the commit
+# You can cherry-pick it or just continue on new branch
+```
+
+### Recovery from Mistakes
+
+If you realize you made a mistake AFTER committing:
+
+```bash
+# ✅ CORRECT: Create a fix commit
+git commit -m "fix: correct the mistake from previous commit"
+
+# ✅ CORRECT: Revert the bad commit
+git revert HEAD
+
+# ❌ WRONG: Try to undo with reset
+git reset --hard HEAD~1  # NEVER DO THIS - loses history
+```
+
+**If you accidentally committed to main:**
+
+```bash
+# DON'T panic or use git reset
+# Just create a feature branch from current position
+git checkout -b feat/your-feature-name
+
+# Push the branch
+git push -u origin feat/your-feature-name
+
+# When merged, it will fast-forward (no conflicts)
+# Main will catch up to the same commit
+```
+
+### Other Git Safety Rules
+
+**CRITICAL GIT SAFETY RULES**:
+
+1. **NEVER use `git push --force` or `git push -f`** - Force pushing destroys history
+2. **NEVER use `git push origin --delete`** - Never delete remote branches
+3. **NEVER use destructive rebase/amend without explicit permission** - These rewrite history
+4. **NEVER perform ANY destructive operations on remote repositories**
+5. **ONLY allowed remote operation is standard `git push` or `git push -u origin branch-name`**
+6. **ALL git push commands require EXPLICIT user authorization**
+7. **Use revert commits instead of force push** - To undo changes, create revert commits
+8. **If you need to overwrite remote**, explain consequences and get explicit confirmation
+
+**IMPORTANT**: NEVER commit, push, revert, or perform ANY git operations without explicit user permission. You are ONLY allowed to delete LOCAL branches with `git branch -D`, NEVER remote branches.
+
+**BRANCH REQUIREMENTS**:
+
+1. **ALL changes MUST be made on a new feature branch, NEVER directly on main**
+2. **BEFORE committing, ALWAYS verify you are NOT on main branch** - Run `git branch --show-current` first
+3. **If accidentally on main**, create a new branch BEFORE committing: `git checkout -b feature/branch-name`
+4. **Branch naming**: Use descriptive names like `feat/feature-name`, `fix/bug-name`, `docs/doc-update`
+
+### Git Commit & Push Workflow
+
+When the user asks you to commit and push:
+
+1. Run `./scripts/format-all.sh` to format all files with Prettier
+2. Run `./scripts/lint-all.sh` to ensure code passes linting
+3. Follow the git commit guidelines in the main Claude system prompt
+4. Get explicit user confirmation before any `git push`
+5. Use only standard push commands - no force flags, no delete operations
+
+**Standard workflow:**
+
+```bash
+# 1. Verify you're on correct branch
+git branch --show-current
+
+# 2. Make changes and commit frequently
+git add -A
+git commit -m "feat: descriptive message"
+
+# 3. Format and test before pushing
+./scripts/format-all.sh
+npm test
+
+# 4. Push to remote (with user permission)
+git push
+```
+
+## WORKING DIRECTORIES
+
+**IMPORTANT**: Never create temporary files in the project root or package directories. Use dedicated gitignored directories for different purposes.
+
+### .tests/ Directory (Test Output Capture)
+
+**Purpose:** Save test run output for analysis without re-running tests
+
+**Usage:**
+
+```bash
+# Create directory (gitignored)
+mkdir -p .tests
+
+# Run tests with tee - shows output AND saves to file
+npm test | tee .tests/run-$(date +%s).txt
+
+# Analyze saved output later without re-running:
+grep "failing" .tests/run-*.txt
+tail -50 .tests/run-*.txt
+grep -A10 "specific test name" .tests/run-*.txt
+```
+
+**Benefits:**
+
+- See test output in real-time (unlike `>` redirection)
+- Analyze failures without expensive re-runs
+- Keep historical test results for comparison
+- Search across multiple test runs
+
+**Key Rule:** ALWAYS use `tee` for test output, NEVER plain redirection (`>` or `2>&1`)
+
+### .analysis/ Directory (Research & Documentation)
+
+**Purpose:** Keep analysis artifacts separate from source code
+
+**Usage:**
+
+```bash
+# Create directory (gitignored)
+mkdir -p .analysis
+
+# Use for:
+# - Code complexity reports
+# - API documentation generation
+# - Dependency analysis
+# - Performance profiling results
+# - Architecture diagrams and documentation
+# - Parser output investigations
+# - Temporary debugging scripts
+```
+
+**Benefits:**
+
+- Keeps analysis work separate from source code
+- Allows iterative analysis without cluttering repository
+- Safe place for temporary debugging scripts
+- Gitignored - no risk of committing debug artifacts
+
+### .todos/ Directory (Persistent Task Tracking)
+
+**Purpose:** Track multi-step tasks across conversation sessions
+
+**Usage:**
+
+```bash
+# Create task file: YYYY-MM-DD-task-name.md
+# Example: 2025-01-13-sql-generation.md
+
+# Task file must include:
+# - Task overview and objectives
+# - Current status (completed work)
+# - Detailed remaining work list
+# - Important decisions made
+# - Code locations affected
+# - Testing requirements
+# - Special considerations
+
+# Mark complete: YYYY-MM-DD-task-name-COMPLETED.md
+```
+
+**Benefits:**
+
+- Resume complex tasks across sessions with full context
+- No loss of progress or decisions
+- Gitignored for persistence
+
+**Note:** All three directories (`.tests/`, `.analysis/`, `.todos/`) should be added to `.gitignore`
 
 ## Session Startup & Task Management
 
@@ -91,30 +382,6 @@ When you begin working on this project, you MUST:
 Only after reading these documents should you proceed with any implementation or analysis tasks.
 
 **IMPORTANT**: After every conversation compact/summary, you MUST re-read this CLAUDE.md file again as your first action.
-
-### Task Management with .todos Directory
-
-**For major multi-step tasks that span sessions:**
-
-1. **Before starting**, create a detailed task file in `.todos/` directory:
-   - Filename format: `YYYY-MM-DD-task-name.md` (e.g., `2025-01-13-sql-generation.md`)
-   - Include ALL context, decisions, completed work, and remaining work
-   - Write comprehensively so the task can be resumed in any future session
-
-2. **Task file must include**:
-   - Task overview and objectives
-   - Current status (what's been completed)
-   - Detailed list of remaining work
-   - Important decisions made
-   - Code locations affected
-   - Testing requirements
-   - Any gotchas or special considerations
-
-3. **When resuming work**, always check `.todos/` first for in-progress tasks
-4. **Update the task file** as you make progress
-5. **Mark as complete** by renaming to `YYYY-MM-DD-task-name-COMPLETED.md`
-
-The `.todos/` directory is gitignored for persistent task tracking across sessions.
 
 ## Project Overview & Principles
 
@@ -214,37 +481,15 @@ npm run test:grep -- "JOIN"
 
 **IMPORTANT**: When running tests with mocha, always use `npm run test:grep -- "pattern"` from the root directory for specific tests. NEVER use `2>&1` redirection with mocha commands. Use `| tee` for output capture.
 
-### Git Workflow
+### Build & Lint Workflow
 
-**CRITICAL GIT SAFETY RULES**:
+**ALWAYS follow this sequence:**
 
-1. **NEVER use `git push --force` or `git push -f`** - Force pushing destroys history
-2. **NEVER use `git push origin --delete`** - Never delete remote branches
-3. **NEVER use `git reset` in ANY form** - This includes `--soft`, `--hard`, `--mixed`. NEVER use git reset
-4. **NEVER use `git clean -fd`** - This permanently deletes untracked files
-5. **NEVER use destructive rebase/amend without explicit permission** - These rewrite history
-6. **NEVER perform ANY destructive operations on remote repositories**
-7. **ONLY allowed remote operation is standard `git push` or `git push -u origin branch-name`**
-8. **ALL git push commands require EXPLICIT user authorization**
-9. **Use revert commits instead of force push** - To undo changes, create revert commits
-10. **If you need to overwrite remote**, explain consequences and get explicit confirmation
+1. Run `./scripts/lint-all.sh` first
+2. Run `./scripts/build.sh`
+3. **If build fails and you make changes**: You MUST run `./scripts/lint-all.sh` again before building
 
-**IMPORTANT**: NEVER commit, push, revert, or perform ANY git operations without explicit user permission. You are ONLY allowed to delete LOCAL branches with `git branch -D`, NEVER remote branches.
-
-**BRANCH REQUIREMENTS**:
-
-1. **ALL changes MUST be made on a new feature branch, NEVER directly on main**
-2. **BEFORE committing, ALWAYS verify you are NOT on main branch** - Run `git branch --show-current` first
-3. **If accidentally on main**, create a new branch BEFORE committing: `git checkout -b feature/branch-name`
-4. **Branch naming**: Use descriptive names like `feat/feature-name`, `fix/bug-name`, `docs/doc-update`
-
-When the user asks you to commit and push:
-
-1. Run `./scripts/format-all.sh` to format all files with Prettier
-2. Run `./scripts/lint-all.sh` to ensure code passes linting
-3. Follow the git commit guidelines in the main Claude system prompt
-4. Get explicit user confirmation before any `git push`
-5. Use only standard push commands - no force flags, no delete operations
+**TIP**: Use `./scripts/build.sh --no-format` during debugging sessions to skip prettier formatting for faster builds.
 
 ## Core Architecture
 
@@ -290,61 +535,6 @@ const member = { type: "member", property: "age", object: param };
 const constant = { type: "constant", value: 18 };
 const comparison = { type: "binary", operator: ">=", left: member, right: constant };
 ```
-
-## Testing & Development Optimization
-
-### Test Output Strategy
-
-**For full test suites**, use `tee` to display output AND save to file:
-
-```bash
-# Create .tests directory if it doesn't exist (gitignored)
-mkdir -p .tests
-
-# Run full test suite with tee - shows output to user AND saves to file
-npm test | tee .tests/run-$(date +%s).txt
-
-# Then analyze saved output without re-running tests:
-grep "failing" .tests/run-*.txt
-tail -50 .tests/run-*.txt
-grep -A10 "specific test name" .tests/run-*.txt
-```
-
-**NEVER use plain redirection (`>` or `2>&1`)** - use `tee` for real-time output visibility.
-
-### Analysis Working Directory
-
-**For long-running analysis, research, or documentation tasks**, use `.analysis/` directory:
-
-```bash
-# Create .analysis directory if it doesn't exist (gitignored)
-mkdir -p .analysis
-
-# Examples of analysis work:
-# - Code complexity reports
-# - API documentation generation
-# - Dependency analysis
-# - Performance profiling results
-# - Architecture diagrams and documentation
-# - SQL generation analysis
-# - Parser output investigations
-```
-
-Benefits: Keeps analysis artifacts separate from source code, allows iterative work without cluttering repository.
-
-### Build & Lint Workflow
-
-**ALWAYS follow this sequence:**
-
-1. Run `./scripts/lint-all.sh` first
-2. Run `./scripts/build.sh`
-3. **If build fails and you make changes**: You MUST run `./scripts/lint-all.sh` again before building
-
-**TIP**: Use `./scripts/build.sh --no-format` during debugging sessions to skip prettier formatting for faster builds.
-
-### Text Replacement Guidelines
-
-**NEVER use `sed` for text replacements**. Always use the Edit or MultiEdit tools to make changes manually. This ensures better control and prevents unintended replacements.
 
 ## Test Files Convention
 
