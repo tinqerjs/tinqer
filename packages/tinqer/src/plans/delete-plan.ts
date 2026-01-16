@@ -1,4 +1,4 @@
-import type { DatabaseSchema } from "../linq/database-context.js";
+import type { DatabaseSchema, RowFilterState } from "../linq/database-context.js";
 import type { QueryBuilder } from "../linq/query-builder.js";
 import type { QueryHelpers } from "../linq/functions.js";
 import type { Deletable, DeletableComplete } from "../linq/deletable.js";
@@ -23,6 +23,7 @@ import {
 } from "../visitors/types.js";
 import { visitWhereDeleteOperation } from "../visitors/delete/where-delete.js";
 import { visitAllowFullDeleteOperation } from "../visitors/delete/allow-full-delete.js";
+import { applyRowFiltersToDeleteOperation } from "../policies/row-filters.js";
 
 // -----------------------------------------------------------------------------
 // Plan data
@@ -35,6 +36,7 @@ export interface DeletePlan<TRecord, TParams> {
   readonly autoParamInfos?: Record<string, unknown>;
   readonly contextSnapshot: VisitorContextSnapshot;
   readonly parseOptions?: ParseQueryOptions;
+  readonly rowFilters?: RowFilterState;
   readonly __type?: {
     record: TRecord;
     params: TParams;
@@ -46,6 +48,7 @@ type DeletePlanState<TRecord, TParams> = DeletePlan<TRecord, TParams>;
 function createInitialState<TRecord, TParams>(
   parseResult: ParseResult,
   options?: ParseQueryOptions,
+  rowFilters?: RowFilterState,
 ): DeletePlanState<TRecord, TParams> {
   const operationClone = cloneOperationTree(parseResult.operation);
   return {
@@ -55,6 +58,7 @@ function createInitialState<TRecord, TParams>(
     autoParamInfos: parseResult.autoParamInfos ? { ...parseResult.autoParamInfos } : undefined,
     contextSnapshot: parseResult.contextSnapshot,
     parseOptions: options,
+    rowFilters,
   };
 }
 
@@ -79,6 +83,7 @@ function createState<TRecord, TParams>(
     autoParamInfos,
     contextSnapshot: nextSnapshot,
     parseOptions: base.parseOptions,
+    rowFilters: base.rowFilters,
   };
 }
 
@@ -126,9 +131,25 @@ export class DeletePlanHandleInitial<TRecord, TParams> {
     return new DeletePlanHandleComplete(nextState);
   }
 
-  finalize(_params: TParams): DeletePlanSql {
-    // Initial stage without WHERE clause - this would be dangerous SQL
-    throw new Error("DELETE requires a WHERE clause or explicit allowFullTableDelete");
+  finalize(params: TParams): DeletePlanSql {
+    const merged = mergeParams(this.state.autoParams, params);
+    const filtered = applyRowFiltersToDeleteOperation(
+      this.state.operation as DeleteOperation,
+      this.state.rowFilters,
+      merged,
+      this.state.contextSnapshot.autoParamCounter,
+    );
+
+    const deleteOp = filtered.operation;
+    if (!deleteOp.predicate && !deleteOp.allowFullTableDelete) {
+      throw new Error("DELETE requires a WHERE clause or explicit allowFullTableDelete");
+    }
+
+    return {
+      operation: filtered.operation,
+      params: filtered.params,
+      autoParamInfos: this.state.autoParamInfos,
+    };
   }
 
   toPlan(): DeletePlan<TRecord, TParams> {
@@ -142,9 +163,15 @@ export class DeletePlanHandleComplete<TRecord, TParams> {
 
   finalize(params: TParams): DeletePlanSql {
     const merged = mergeParams(this.state.autoParams, params);
+    const filtered = applyRowFiltersToDeleteOperation(
+      this.state.operation as DeleteOperation,
+      this.state.rowFilters,
+      merged,
+      this.state.contextSnapshot.autoParamCounter,
+    );
     return {
-      operation: this.state.operation,
-      params: merged,
+      operation: filtered.operation,
+      params: filtered.params,
       autoParamInfos: this.state.autoParamInfos,
     };
   }
@@ -194,7 +221,7 @@ export function defineDelete<
 
 // Implementation
 export function defineDelete(
-  _schema: DatabaseSchema<unknown>,
+  schema: DatabaseSchema<unknown>,
   builder: (
     queryBuilder: QueryBuilder<unknown>,
     params: unknown,
@@ -208,7 +235,8 @@ export function defineDelete(
     throw new Error("Failed to parse delete builder or not a delete operation");
   }
 
-  const initialState = createInitialState<unknown, unknown>(parseResult, options);
+  const rowFilters = schema.__tinqerRowFilters();
+  const initialState = createInitialState<unknown, unknown>(parseResult, options, rowFilters);
 
   // Check the state of the parsed operation to return the appropriate handle
   const deleteOp = parseResult.operation as DeleteOperation;

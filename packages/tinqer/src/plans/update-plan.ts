@@ -1,4 +1,4 @@
-import type { DatabaseSchema } from "../linq/database-context.js";
+import type { DatabaseSchema, RowFilterState } from "../linq/database-context.js";
 import type { QueryBuilder } from "../linq/query-builder.js";
 import type { QueryHelpers } from "../linq/functions.js";
 import type {
@@ -30,6 +30,7 @@ import { visitWhereUpdateOperation } from "../visitors/update/where-update.js";
 import { visitSetOperation } from "../visitors/update/set.js";
 import { visitAllowFullUpdateOperation } from "../visitors/update/allow-full-update.js";
 import { visitReturningUpdateOperation } from "../visitors/update/returning-update.js";
+import { applyRowFiltersToUpdateOperation } from "../policies/row-filters.js";
 
 // -----------------------------------------------------------------------------
 // Plan data
@@ -42,6 +43,7 @@ export interface UpdatePlan<TRecord, TParams> {
   readonly autoParamInfos?: Record<string, unknown>;
   readonly contextSnapshot: VisitorContextSnapshot;
   readonly parseOptions?: ParseQueryOptions;
+  readonly rowFilters?: RowFilterState;
   readonly __type?: {
     record: TRecord;
     params: TParams;
@@ -53,6 +55,7 @@ type UpdatePlanState<TRecord, TParams> = UpdatePlan<TRecord, TParams>;
 function createInitialState<TRecord, TParams>(
   parseResult: ParseResult,
   options?: ParseQueryOptions,
+  rowFilters?: RowFilterState,
 ): UpdatePlanState<TRecord, TParams> {
   const operationClone = cloneOperationTree(parseResult.operation);
   return {
@@ -62,6 +65,7 @@ function createInitialState<TRecord, TParams>(
     autoParamInfos: parseResult.autoParamInfos ? { ...parseResult.autoParamInfos } : undefined,
     contextSnapshot: parseResult.contextSnapshot,
     parseOptions: options,
+    rowFilters,
   };
 }
 
@@ -86,6 +90,7 @@ function createState<TRecord, TParams>(
     autoParamInfos,
     contextSnapshot: nextSnapshot,
     parseOptions: base.parseOptions,
+    rowFilters: base.rowFilters,
   };
 }
 
@@ -164,9 +169,15 @@ export class UpdatePlanHandleWithSet<TRecord, TParams> {
 
   finalize(params: TParams): UpdatePlanSql {
     const merged = mergeParams(this.state.autoParams, params);
+    const filtered = applyRowFiltersToUpdateOperation(
+      this.state.operation as UpdateOperation,
+      this.state.rowFilters,
+      merged,
+      this.state.contextSnapshot.autoParamCounter,
+    );
     return {
-      operation: this.state.operation,
-      params: merged,
+      operation: filtered.operation,
+      params: filtered.params,
       autoParamInfos: this.state.autoParamInfos,
     };
   }
@@ -198,9 +209,15 @@ export class UpdatePlanHandleComplete<TRecord, TParams> {
 
   finalize(params: TParams): UpdatePlanSql {
     const merged = mergeParams(this.state.autoParams, params);
+    const filtered = applyRowFiltersToUpdateOperation(
+      this.state.operation as UpdateOperation,
+      this.state.rowFilters,
+      merged,
+      this.state.contextSnapshot.autoParamCounter,
+    );
     return {
-      operation: this.state.operation,
-      params: merged,
+      operation: filtered.operation,
+      params: filtered.params,
       autoParamInfos: this.state.autoParamInfos,
     };
   }
@@ -222,9 +239,15 @@ export class UpdatePlanHandleWithReturning<TResult, TParams> {
 
   finalize(params: TParams): UpdatePlanSql {
     const merged = mergeParams(this.state.autoParams, params);
+    const filtered = applyRowFiltersToUpdateOperation(
+      this.state.operation as UpdateOperation,
+      this.state.rowFilters,
+      merged,
+      this.state.contextSnapshot.autoParamCounter,
+    );
     return {
-      operation: this.state.operation,
-      params: merged,
+      operation: filtered.operation,
+      params: filtered.params,
       autoParamInfos: this.state.autoParamInfos,
     };
   }
@@ -273,7 +296,7 @@ export function defineUpdate<
 
 // Implementation
 export function defineUpdate(
-  _schema: DatabaseSchema<unknown>,
+  schema: DatabaseSchema<unknown>,
   builder: (
     queryBuilder: QueryBuilder<unknown>,
     params: unknown,
@@ -287,7 +310,8 @@ export function defineUpdate(
     throw new Error("Failed to parse update builder or not an update operation");
   }
 
-  const initialState = createInitialState<unknown, unknown>(parseResult, options);
+  const rowFilters = schema.__tinqerRowFilters();
+  const initialState = createInitialState<unknown, unknown>(parseResult, options, rowFilters);
 
   // Check the state of the parsed operation to return the appropriate handle
   const updateOp = parseResult.operation as UpdateOperation;

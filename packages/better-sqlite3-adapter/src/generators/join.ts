@@ -313,11 +313,18 @@ export function generateJoin(operation: JoinOperation, context: SqlContext): str
 
   if (operation.inner.operationType === "from") {
     const fromOp = operation.inner as FromOperation;
-    const tableName = fromOp.table;
-    joinClause = `${joinKeyword} "${tableName}" AS "${innerAlias}"`;
+    if (fromOp.subquery) {
+      const innerSql = generateSql(fromOp.subquery, context.params);
+      joinClause = `${joinKeyword} (${innerSql}) AS "${innerAlias}"`;
+    } else {
+      const tableName = fromOp.schema
+        ? `"${fromOp.schema}"."${fromOp.table}"`
+        : `"${fromOp.table}"`;
+      joinClause = `${joinKeyword} ${tableName} AS "${innerAlias}"`;
+    }
   } else {
     // Complex inner query - need subquery
-    const innerSql = generateSql(operation.inner, {});
+    const innerSql = generateSql(operation.inner, context.params);
     joinClause = `${joinKeyword} (${innerSql}) AS "${innerAlias}"`;
   }
 

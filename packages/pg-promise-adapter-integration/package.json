@@ -1,6 +1,6 @@
 {
   "name": "@tinqerjs/pg-promise-adapter-integration",
-  "version": "0.0.22",
+  "version": "0.0.23",
   "description": "PostgreSQL integration tests for Tinqer using pg-promise",
   "type": "module",
   "private": true,
