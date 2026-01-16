@@ -74,6 +74,7 @@ export interface VisitorContext {
   currentTable?: string; // Current table being processed
   inSelectProjection?: boolean; // Whether we're in a SELECT projection
   hasTableParam?: boolean; // Whether lambda has table parameter
+  upsertExcludedParam?: string; // EXCLUDED alias binding for INSERT upserts
 
   // Expected result type (guides visitor selection)
   expectedType?: "boolean" | "value" | "object" | "array" | "any";

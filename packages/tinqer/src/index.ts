@@ -55,6 +55,7 @@ export type {
 
   // Value expressions
   ColumnExpression,
+  ExcludedColumnExpression,
   ConstantExpression,
   ParameterExpression,
   ArithmeticExpression,

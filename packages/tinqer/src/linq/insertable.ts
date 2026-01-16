@@ -20,6 +20,17 @@ export class Insertable<T> {
   }
 
   /**
+   * Adds an ON CONFLICT clause for upserts (PostgreSQL + SQLite)
+   * Column targets are expressed as typed selectors (no string column names).
+   */
+  onConflict(
+    _target: (_item: T) => unknown,
+    ..._additionalTargets: Array<(_item: T) => unknown>
+  ): InsertableOnConflict<T> {
+    return new InsertableOnConflict<T>();
+  }
+
+  /**
    * Specifies columns to return after insert (PostgreSQL only)
    * @param selector Function that returns the columns to return
    * @returns InsertableWithReturning for type inference
@@ -41,4 +52,31 @@ export class InsertableWithReturning<TTable, TResult> {
   // Force TypeScript to keep the type parameters
   _table?: (_: TTable) => void;
   _result?: (_: TResult) => void;
+}
+
+/**
+ * InsertableOnConflict represents an INSERT with an ON CONFLICT target
+ */
+export class InsertableOnConflict<TTable> {
+  constructor() {
+    // Never actually instantiated - used only for type inference
+  }
+
+  /**
+   * ON CONFLICT ... DO NOTHING
+   */
+  doNothing(): Insertable<TTable> {
+    return new Insertable<TTable>();
+  }
+
+  /**
+   * ON CONFLICT ... DO UPDATE SET ...
+   */
+  doUpdateSet(_valuesSelector: Partial<TTable>): Insertable<TTable>;
+  doUpdateSet(
+    _valuesSelector: (_existing: TTable, _excluded: TTable) => Partial<TTable>,
+  ): Insertable<TTable>;
+  doUpdateSet(_valuesSelector: unknown): Insertable<TTable> {
+    return new Insertable<TTable>();
+  }
 }

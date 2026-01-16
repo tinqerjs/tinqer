@@ -28,6 +28,14 @@ export interface ColumnExpression {
 }
 
 /**
+ * EXCLUDED column reference for INSERT ... ON CONFLICT DO UPDATE
+ */
+export interface ExcludedColumnExpression {
+  type: "excludedColumn";
+  name: string;
+}
+
+/**
  * Constant value - literal values
  */
 export interface ConstantExpression {
@@ -138,6 +146,7 @@ export interface AllColumnsExpression {
  */
 export type ValueExpression =
   | ColumnExpression
+  | ExcludedColumnExpression
   | ConstantExpression
   | ParameterExpression
   | ArithmeticExpression
@@ -368,6 +377,7 @@ export type Expression =
 export function isValueExpression(expr: Expression): expr is ValueExpression {
   return [
     "column",
+    "excludedColumn",
     "constant",
     "param",
     "arithmetic",

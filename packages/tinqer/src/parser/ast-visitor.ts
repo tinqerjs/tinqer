@@ -49,6 +49,9 @@ import { visitReverseOperation } from "../visitors/reverse/index.js";
 import { visitInsertOperation } from "../visitors/insert/index.js";
 import { visitValuesOperation } from "../visitors/insert/values.js";
 import { visitReturningOperation } from "../visitors/insert/returning.js";
+import { visitOnConflictOperation } from "../visitors/insert/on-conflict.js";
+import { visitDoNothingOperation } from "../visitors/insert/do-nothing.js";
+import { visitDoUpdateSetOperation } from "../visitors/insert/do-update-set.js";
 import { visitUpdateOperation } from "../visitors/update/index.js";
 import { visitSetOperation } from "../visitors/update/set.js";
 import { visitWhereUpdateOperation } from "../visitors/update/where-update.js";
@@ -657,6 +660,48 @@ function visitCallExpression(
           throw new Error("values() can only be called on INSERT operations");
         }
         const result = visitValuesOperation(ast, source as InsertOperation, visitorContext);
+        if (result) {
+          for (const [key, value] of Object.entries(result.autoParams)) {
+            visitorContext.autoParams.set(key, value);
+          }
+          return result.operation;
+        }
+        return null;
+      }
+
+      case "onConflict": {
+        if (source.operationType !== "insert") {
+          throw new Error("onConflict() can only be called on INSERT operations");
+        }
+        const result = visitOnConflictOperation(ast, source as InsertOperation, visitorContext);
+        if (result) {
+          for (const [key, value] of Object.entries(result.autoParams)) {
+            visitorContext.autoParams.set(key, value);
+          }
+          return result.operation;
+        }
+        return null;
+      }
+
+      case "doNothing": {
+        if (source.operationType !== "insert") {
+          throw new Error("doNothing() can only be called on INSERT operations");
+        }
+        const result = visitDoNothingOperation(ast, source as InsertOperation, visitorContext);
+        if (result) {
+          for (const [key, value] of Object.entries(result.autoParams)) {
+            visitorContext.autoParams.set(key, value);
+          }
+          return result.operation;
+        }
+        return null;
+      }
+
+      case "doUpdateSet": {
+        if (source.operationType !== "insert") {
+          throw new Error("doUpdateSet() can only be called on INSERT operations");
+        }
+        const result = visitDoUpdateSetOperation(ast, source as InsertOperation, visitorContext);
         if (result) {
           for (const [key, value] of Object.entries(result.autoParams)) {
             visitorContext.autoParams.set(key, value);

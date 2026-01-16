@@ -4,6 +4,7 @@ import {
   defineInsert,
   InsertPlanHandleInitial,
   InsertPlanHandleWithValues,
+  InsertPlanHandleWithConflictTarget,
 } from "../src/plans/insert-plan.js";
 import { createSchema } from "../src/linq/database-context.js";
 import type { QueryBuilder } from "../src/linq/query-builder.js";
@@ -159,6 +160,69 @@ describe("InsertPlanHandle", () => {
 
       expect(insertOp).to.have.property("returning");
       expect(insertOp.returning).to.exist;
+    });
+  });
+
+  describe("Upsert (ON CONFLICT)", () => {
+    it("should support ON CONFLICT DO NOTHING", () => {
+      const plan = defineInsert(testSchema, (qb: QueryBuilder<TestSchema>) =>
+        qb.insertInto("users"),
+      )
+        .values({
+          name: "Alice",
+          email: "alice@example.com",
+        })
+        .onConflict((u) => u.email);
+
+      expect(plan).to.be.instanceOf(InsertPlanHandleWithConflictTarget);
+
+      const finalized = plan.doNothing().finalize({});
+      const insertOp = finalized.operation as InsertOperation;
+
+      expect(insertOp.onConflict).to.exist;
+      expect(insertOp.onConflict?.target).to.deep.equal(["email"]);
+      expect(insertOp.onConflict?.action).to.have.property("type", "nothing");
+    });
+
+    it("should support ON CONFLICT with multiple target columns", () => {
+      const plan = defineInsert(testSchema, (qb: QueryBuilder<TestSchema>) =>
+        qb.insertInto("users"),
+      )
+        .values({
+          name: "Alice",
+          email: "alice@example.com",
+        })
+        .onConflict((u) => u.email, (u) => u.name);
+
+      const finalized = plan.doNothing().finalize({});
+      const insertOp = finalized.operation as InsertOperation;
+
+      expect(insertOp.onConflict).to.exist;
+      expect(insertOp.onConflict?.target).to.deep.equal(["email", "name"]);
+      expect(insertOp.onConflict?.action).to.have.property("type", "nothing");
+    });
+
+    it("should support ON CONFLICT DO UPDATE SET using excluded", () => {
+      const plan = defineInsert(testSchema, (qb: QueryBuilder<TestSchema>) =>
+        qb.insertInto("users"),
+      )
+        .values({
+          name: "Alice",
+          email: "alice@example.com",
+        })
+        .onConflict((u) => u.email)
+        .doUpdateSet((_existing, excluded) => ({
+          name: excluded.name,
+        }));
+
+      expect(plan).to.be.instanceOf(InsertPlanHandleWithValues);
+
+      const finalized = plan.finalize({});
+      const insertOp = finalized.operation as InsertOperation;
+
+      expect(insertOp.onConflict).to.exist;
+      expect(insertOp.onConflict?.target).to.deep.equal(["email"]);
+      expect(insertOp.onConflict?.action).to.have.property("type", "update");
     });
   });
 

@@ -1706,6 +1706,62 @@ VALUES (@name, @age, @__p1)        -- SQLite
 
 > **Tip:** When a property in `.values()` evaluates to `undefined`, the column is omitted from the INSERT. Explicit `null` values still emit `NULL`. The insert throws if every value is `undefined`.
 
+#### INSERT Upserts (ON CONFLICT)
+
+Tinqer supports upserts for PostgreSQL and SQLite via `ON CONFLICT`. Conflict targets use **typed column selectors** (no string column names). Composite conflict targets are specified by passing multiple selectors: `.onConflict((u) => u.col1, (u) => u.col2)`.
+
+```typescript
+// Ignore duplicates (ON CONFLICT DO NOTHING)
+const upsertIgnore = toSql(
+  defineInsert(schema, (q, params: { email: string; name: string }) =>
+    q
+      .insertInto("users")
+      .values({ email: params.email, name: params.name })
+      .onConflict((u) => u.email)
+      .doNothing(),
+  ),
+  { email: "alice@example.com", name: "Alice" },
+);
+
+// Update on conflict (ON CONFLICT DO UPDATE SET ...)
+const upsertUpdate = toSql(
+  defineInsert(schema, (q, params: { email: string; name: string }) =>
+    q
+      .insertInto("users")
+      .values({ email: params.email, name: params.name })
+      .onConflict((u) => u.email)
+      .doUpdateSet((_existing, excluded) => ({
+        name: excluded.name,
+      })),
+  ),
+  { email: "alice@example.com", name: "Alice" },
+);
+```
+
+Generated SQL:
+
+```sql
+-- PostgreSQL
+INSERT INTO "users" ("email", "name")
+VALUES ($(email), $(name))
+ON CONFLICT ("email") DO NOTHING
+
+INSERT INTO "users" ("email", "name")
+VALUES ($(email), $(name))
+ON CONFLICT ("email") DO UPDATE SET "name" = EXCLUDED."name"
+
+-- SQLite
+INSERT INTO "users" ("email", "name")
+VALUES (@email, @name)
+ON CONFLICT ("email") DO NOTHING
+
+INSERT INTO "users" ("email", "name")
+VALUES (@email, @name)
+ON CONFLICT ("email") DO UPDATE SET "name" = excluded."name"
+```
+
+> **Note:** `onConflict(...)` must be followed by either `.doNothing()` or `.doUpdateSet(...)`.
+
 #### INSERT with RETURNING Clause
 
 Both PostgreSQL and SQLite (3.35.0+) support the RETURNING clause to retrieve values from inserted rows:

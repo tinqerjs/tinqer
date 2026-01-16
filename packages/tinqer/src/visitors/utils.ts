@@ -32,6 +32,7 @@ export function isValueExpression(expr: Expression | unknown): boolean {
   const type = (expr as Expression).type;
   return [
     "column",
+    "excludedColumn",
     "constant",
     "param",
     "arithmetic",

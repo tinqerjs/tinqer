@@ -479,6 +479,16 @@ export interface InsertOperation extends QueryOperation {
   schema?: string;
   values: ObjectExpression; // Column-value mapping
   returning?: ValueExpression | ObjectExpression; // For PostgreSQL RETURNING clause
+  onConflict?: InsertOnConflictClause; // ON CONFLICT / upsert support
+}
+
+export type InsertOnConflictAction =
+  | { type: "nothing" }
+  | { type: "update"; assignments: ObjectExpression };
+
+export interface InsertOnConflictClause {
+  target: string[]; // Column names
+  action?: InsertOnConflictAction;
 }
 
 /**

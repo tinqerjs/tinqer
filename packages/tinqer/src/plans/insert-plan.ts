@@ -24,6 +24,9 @@ import {
 } from "../visitors/types.js";
 import { visitValuesOperation } from "../visitors/insert/values.js";
 import { visitReturningOperation } from "../visitors/insert/returning.js";
+import { visitOnConflictOperation } from "../visitors/insert/on-conflict.js";
+import { visitDoNothingOperation } from "../visitors/insert/do-nothing.js";
+import { visitDoUpdateSetOperation } from "../visitors/insert/do-update-set.js";
 
 // -----------------------------------------------------------------------------
 // Plan data
@@ -120,6 +123,17 @@ export class InsertPlanHandleInitial<TRecord, TParams> {
 export class InsertPlanHandleWithValues<TRecord, TParams> {
   constructor(private readonly state: InsertPlanState<TRecord, TParams>) {}
 
+  onConflict(
+    target: (row: TRecord) => unknown,
+    ...additionalTargets: Array<(row: TRecord) => unknown>
+  ): InsertPlanHandleWithConflictTarget<TRecord, TParams> {
+    const nextState = appendOnConflict(this.state, [
+      target as unknown as (row: unknown) => unknown,
+      ...additionalTargets.map((t) => t as unknown as (row: unknown) => unknown),
+    ]);
+    return new InsertPlanHandleWithConflictTarget(nextState);
+  }
+
   returning<TResult>(
     selector: (item: TRecord) => TResult,
   ): InsertPlanHandleWithReturning<TResult, TParams> {
@@ -147,6 +161,41 @@ export class InsertPlanHandleWithValues<TRecord, TParams> {
     return Promise.reject(
       new Error("execute() is not implemented. Use adapter methods (toSql/executeInsert) instead."),
     );
+  }
+}
+
+export class InsertPlanHandleWithConflictTarget<TRecord, TParams> {
+  constructor(private readonly state: InsertPlanState<TRecord, TParams>) {}
+
+  doNothing(): InsertPlanHandleWithValues<TRecord, TParams> {
+    const nextState = appendDoNothing(this.state);
+    return new InsertPlanHandleWithValues(nextState);
+  }
+
+  doUpdateSet(values: Partial<TRecord>): InsertPlanHandleWithValues<TRecord, TParams>;
+  doUpdateSet(
+    selector: (existing: TRecord, excluded: TRecord) => Partial<TRecord>,
+  ): InsertPlanHandleWithValues<TRecord, TParams>;
+  doUpdateSet(
+    valuesOrSelector:
+      | Partial<TRecord>
+      | ((existing: TRecord, excluded: TRecord) => Partial<TRecord>),
+  ): InsertPlanHandleWithValues<TRecord, TParams> {
+    const nextState = appendDoUpdateSet(
+      this.state,
+      valuesOrSelector as
+        | Record<string, unknown>
+        | ((existing: unknown, excluded: unknown) => Record<string, unknown>),
+    );
+    return new InsertPlanHandleWithValues(nextState);
+  }
+
+  finalize(_params: TParams): InsertPlanSql {
+    throw new Error("INSERT upsert requires doNothing() or doUpdateSet() before generating SQL");
+  }
+
+  toPlan(): InsertPlan<TRecord, TParams> {
+    return this.state;
   }
 }
 
@@ -258,7 +307,7 @@ function appendValues<TRecord, TParams>(
     })),
   } as ASTObjectExpression;
 
-  const call = createMethodCall("values", valuesExpression);
+  const call = createMethodCall("values", [valuesExpression]);
   const result = visitValuesOperation(call, state.operation as InsertOperation, visitorContext);
 
   if (!result) {
@@ -276,7 +325,7 @@ function appendReturning<TRecord, TParams>(
 ): InsertPlanState<unknown, TParams> {
   const visitorContext = restoreVisitorContext(state.contextSnapshot);
   const lambda = parseLambdaExpression(selector as (...args: unknown[]) => unknown, "returning");
-  const call = createMethodCall("returning", lambda);
+  const call = createMethodCall("returning", [lambda]);
   const result = visitReturningOperation(call, state.operation as InsertOperation, visitorContext);
 
   if (!result) {
@@ -288,6 +337,71 @@ function appendReturning<TRecord, TParams>(
     result.operation,
     visitorContext,
   );
+}
+
+function appendOnConflict<TRecord, TParams>(
+  state: InsertPlanState<TRecord, TParams>,
+  targets: Array<(row: unknown) => unknown>,
+): InsertPlanState<TRecord, TParams> {
+  const visitorContext = restoreVisitorContext(state.contextSnapshot);
+
+  const lambdas = targets.map((t) => parseLambdaExpression(t, "onConflict"));
+  const call = createMethodCall("onConflict", lambdas);
+  const result = visitOnConflictOperation(call, state.operation as InsertOperation, visitorContext);
+
+  if (!result) {
+    throw new Error("Failed to append onConflict to insert plan");
+  }
+
+  return createState(state, result.operation, visitorContext);
+}
+
+function appendDoNothing<TRecord, TParams>(
+  state: InsertPlanState<TRecord, TParams>,
+): InsertPlanState<TRecord, TParams> {
+  const visitorContext = restoreVisitorContext(state.contextSnapshot);
+  const call = createMethodCall("doNothing");
+  const result = visitDoNothingOperation(call, state.operation as InsertOperation, visitorContext);
+
+  if (!result) {
+    throw new Error("Failed to append doNothing to insert plan");
+  }
+
+  return createState(state, result.operation, visitorContext);
+}
+
+function appendDoUpdateSet<TRecord, TParams>(
+  state: InsertPlanState<TRecord, TParams>,
+  valuesOrSelector:
+    | Record<string, unknown>
+    | ((existing: unknown, excluded: unknown) => Record<string, unknown>),
+): InsertPlanState<TRecord, TParams> {
+  const visitorContext = restoreVisitorContext(state.contextSnapshot);
+
+  const arg =
+    typeof valuesOrSelector === "function"
+      ? parseLambdaExpression(valuesOrSelector as (...args: unknown[]) => unknown, "doUpdateSet")
+      : ({
+          type: "ObjectExpression",
+          properties: Object.entries(valuesOrSelector).map(([key, value]) => ({
+            type: "Property",
+            key: { type: "Identifier", name: key },
+            value: { type: "Literal", value },
+            kind: "init",
+            method: false,
+            shorthand: false,
+            computed: false,
+          })),
+        } as ASTObjectExpression);
+
+  const call = createMethodCall("doUpdateSet", [arg]);
+  const result = visitDoUpdateSetOperation(call, state.operation as InsertOperation, visitorContext);
+
+  if (!result) {
+    throw new Error("Failed to append doUpdateSet to insert plan");
+  }
+
+  return createState(state, result.operation, visitorContext);
 }
 
 // -----------------------------------------------------------------------------
@@ -314,7 +428,7 @@ function parseLambdaExpression(
   return expression;
 }
 
-function createMethodCall(methodName: string, argument?: ASTExpression): CallExpression {
+function createMethodCall(methodName: string, args: ASTExpression[] = []): CallExpression {
   return {
     type: "CallExpression",
     callee: {
@@ -330,7 +444,7 @@ function createMethodCall(methodName: string, argument?: ASTExpression): CallExp
       computed: false,
       optional: false,
     },
-    arguments: argument ? [argument] : [],
+    arguments: args,
     optional: false,
   } as CallExpression;
 }
