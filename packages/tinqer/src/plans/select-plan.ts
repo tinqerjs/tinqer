@@ -2,7 +2,7 @@ import { Queryable } from "../linq/queryable.js";
 import { TerminalQuery } from "../linq/terminal-query.js";
 import type { QueryHelpers } from "../linq/functions.js";
 import type { QueryBuilder } from "../linq/query-builder.js";
-import type { DatabaseSchema } from "../linq/database-context.js";
+import type { DatabaseSchema, RowFilterState } from "../linq/database-context.js";
 import type { Grouping } from "../linq/grouping.js";
 import type { ParseQueryOptions } from "../parser/types.js";
 import type { QueryOperation } from "../query-tree/operations.js";
@@ -42,6 +42,7 @@ import { visitMinOperation } from "../visitors/aggregates/min.js";
 import { visitMaxOperation } from "../visitors/aggregates/max.js";
 import { visitAnyOperation } from "../visitors/boolean-predicates/any.js";
 import { visitAllOperation } from "../visitors/boolean-predicates/all.js";
+import { applyRowFiltersToSelectOperation } from "../policies/row-filters.js";
 
 // -----------------------------------------------------------------------------
 // Plan data
@@ -54,6 +55,7 @@ export interface SelectPlan<TRecord, TParams> {
   readonly autoParamInfos?: Record<string, unknown>;
   readonly contextSnapshot: VisitorContextSnapshot;
   readonly parseOptions?: ParseQueryOptions;
+  readonly rowFilters?: RowFilterState;
   readonly __type?: {
     record: TRecord;
     params: TParams;
@@ -65,6 +67,7 @@ type SelectPlanState<TRecord, TParams> = SelectPlan<TRecord, TParams>;
 function createInitialState<TRecord, TParams>(
   parseResult: ParseResult,
   options?: ParseQueryOptions,
+  rowFilters?: RowFilterState,
 ): SelectPlanState<TRecord, TParams> {
   const operationClone = cloneOperationTree(parseResult.operation);
   return {
@@ -74,6 +77,7 @@ function createInitialState<TRecord, TParams>(
     autoParamInfos: parseResult.autoParamInfos ? { ...parseResult.autoParamInfos } : undefined,
     contextSnapshot: parseResult.contextSnapshot,
     parseOptions: options,
+    rowFilters,
   };
 }
 
@@ -98,6 +102,7 @@ function createState<TRecord, TParams>(
     autoParamInfos,
     contextSnapshot: nextSnapshot,
     parseOptions: base.parseOptions,
+    rowFilters: base.rowFilters,
   };
 }
 
@@ -118,9 +123,15 @@ export class SelectPlanHandle<TRecord, TParams> extends Queryable<TRecord> {
 
   finalize(params: TParams): SelectPlanSql {
     const merged = mergeParams(this.state.autoParams, params);
+    const filtered = applyRowFiltersToSelectOperation(
+      this.state.operation,
+      this.state.rowFilters,
+      merged,
+      this.state.contextSnapshot.autoParamCounter,
+    );
     return {
-      operation: this.state.operation,
-      params: merged,
+      operation: filtered.operation,
+      params: filtered.params,
       autoParamInfos: this.state.autoParamInfos,
     };
   }
@@ -315,9 +326,15 @@ export class SelectTerminalHandle<TResult, TParams> extends TerminalQuery<TResul
 
   finalize(params: TParams): SelectPlanSql {
     const merged = mergeParams(this.state.autoParams, params);
+    const filtered = applyRowFiltersToSelectOperation(
+      this.state.operation,
+      this.state.rowFilters,
+      merged,
+      this.state.contextSnapshot.autoParamCounter,
+    );
     return {
-      operation: this.state.operation,
-      params: merged,
+      operation: filtered.operation,
+      params: filtered.params,
       autoParamInfos: this.state.autoParamInfos,
     };
   }
@@ -386,7 +403,7 @@ export function defineSelect<
   TParams = Record<string, never>,
   TQuery extends SelectResult = SelectResult,
 >(
-  _schema: DatabaseSchema<TSchema>,
+  schema: DatabaseSchema<TSchema>,
   builder: SelectBuilder<TSchema, TParams, TQuery>,
   options?: ParseQueryOptions,
 ): SelectPlanHandle<unknown, TParams> | SelectTerminalHandle<unknown, TParams> {
@@ -395,7 +412,8 @@ export function defineSelect<
     throw new Error("Failed to parse query");
   }
 
-  const initialState = createInitialState<unknown, TParams>(parseResult, options);
+  const rowFilters = schema.__tinqerRowFilters();
+  const initialState = createInitialState<unknown, TParams>(parseResult, options, rowFilters);
 
   // Check if this is a terminal operation
   const isTerminal = [

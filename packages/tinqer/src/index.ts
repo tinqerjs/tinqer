@@ -10,7 +10,14 @@ export { Queryable, OrderedQueryable } from "./linq/queryable.js";
 export { TerminalQuery } from "./linq/terminal-query.js";
 export { from } from "./linq/from.js";
 export { Grouping } from "./linq/grouping.js";
-export { DatabaseSchema, createSchema } from "./linq/database-context.js";
+export { DatabaseSchema, RowFilteredSchema, createSchema } from "./linq/database-context.js";
+export type {
+  RowFilterOperation,
+  RowFilterPredicate,
+  TableRowFilters,
+  RowFilterMap,
+  RowFilterState,
+} from "./linq/database-context.js";
 export {
   functions,
   createQueryHelpers,
