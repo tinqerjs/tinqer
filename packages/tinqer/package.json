@@ -1,6 +1,6 @@
 {
   "name": "@tinqerjs/tinqer",
-  "version": "0.0.24",
+  "version": "0.0.25",
   "description": "LINQ to SQL for TypeScript",
   "type": "module",
   "main": "./dist/index.js",
