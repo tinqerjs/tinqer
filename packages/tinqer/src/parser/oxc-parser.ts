@@ -3,12 +3,7 @@
  * Wraps the OXC WASM parser for JavaScript/TypeScript parsing
  */
 
-import { parseSync, rawTransferSupported, type ParserOptions } from "oxc-parser";
-
-type InternalParserOptions = ParserOptions & {
-  experimentalRawTransfer?: boolean;
-  experimentalLazy?: boolean;
-};
+import { parseSync, type ParserOptions } from "oxc-parser";
 
 const DEFAULT_PARSER_OPTIONS: ParserOptions = {
   sourceType: "module",
@@ -28,34 +23,7 @@ export function parseJavaScript(code: string): unknown {
       return null;
     }
 
-    try {
-      return result.program;
-    } catch (error) {
-      console.error("Failed to materialize AST:", error);
-
-      if (!rawTransferSupported()) {
-        return null;
-      }
-
-      const rawTransferOptions: InternalParserOptions = {
-        ...DEFAULT_PARSER_OPTIONS,
-        experimentalRawTransfer: true,
-      };
-
-      try {
-        const rawTransferResult = parseSync("query.ts", code, rawTransferOptions);
-
-        if (rawTransferResult.errors.length > 0) {
-          console.error("Parse errors:", rawTransferResult.errors);
-          return null;
-        }
-
-        return rawTransferResult.program;
-      } catch (rawTransferError) {
-        console.error("Failed to parse JavaScript (raw transfer):", rawTransferError);
-        return null;
-      }
-    }
+    return result.program;
   } catch (error) {
     console.error("Failed to parse JavaScript:", error);
     return null;
