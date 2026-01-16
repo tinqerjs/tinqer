@@ -1,6 +1,6 @@
 {
   "name": "@tinqerjs/pg-promise-adapter",
-  "version": "0.0.23",
+  "version": "0.0.24",
   "description": "pg-promise SQL generator for Tinqer query builder",
   "type": "module",
   "main": "./dist/index.js",
@@ -19,7 +19,7 @@
   },
   "dependencies": {},
   "peerDependencies": {
-    "@tinqerjs/tinqer": "^0.0.23"
+    "@tinqerjs/tinqer": "^0.0.24"
   },
   "devDependencies": {
     "@types/chai": "5.2.2",
