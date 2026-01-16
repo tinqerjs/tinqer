@@ -66,6 +66,10 @@ Complete reference for all query operations, parameters, and CRUD functionality 
   - [15.4 Parameter Accumulation](#154-parameter-accumulation)
   - [15.5 Composition with All Operations](#155-composition-with-all-operations)
   - [15.6 Practical Patterns](#156-practical-patterns)
+- [16. Row Filters](#16-row-filters)
+  - [16.1 Basic Usage](#161-basic-usage)
+  - [16.2 Per-Operation Filters](#162-per-operation-filters)
+  - [16.3 Behavior Notes](#163-behavior-notes)
 
 ---
 
@@ -2451,5 +2455,55 @@ toSql(repo.findActiveInDepartment(5), {});
 **Key Takeaway**: Query composition enables building reusable, composable query fragments that can be combined and specialized without duplication.
 
 ---
+
+## 16. Row Filters
+
+Row filters let you attach row-level predicates to a schema so that SELECT/UPDATE/DELETE automatically include them. This is useful for authorization scoping, and can provide an RLS-like safety net even on databases without native RLS support.
+
+### 16.1 Basic Usage
+
+```typescript
+import { createSchema } from "@tinqerjs/tinqer";
+
+interface Schema {
+  users: { id: number; orgId: number; email: string };
+  posts: { id: number; orgId: number; title: string };
+}
+
+type ScopeContext = { orgId: number };
+
+const dangerousUnrestrictedSchema = createSchema<Schema>();
+
+const rowFilteredSchema = dangerousUnrestrictedSchema.withRowFilters<ScopeContext>({
+  users: (u, ctx) => u.orgId === ctx.orgId,
+  posts: (p, ctx) => p.orgId === ctx.orgId,
+});
+
+const schema = rowFilteredSchema.withContext({ orgId: 7 });
+```
+
+Use `schema` anywhere you would normally pass a `DatabaseSchema` (execution or plan APIs). Any SELECT/UPDATE/DELETE built from it will include the filter automatically.
+
+### 16.2 Per-Operation Filters
+
+You can define different filters per operation, or disable filtering for a specific table by using `null`.
+
+```typescript
+const schemaWithPolicies = dangerousUnrestrictedSchema.withRowFilters<ScopeContext>({
+  users: {
+    select: (u, ctx) => u.orgId === ctx.orgId,
+    update: (u, ctx) => u.orgId === ctx.orgId,
+    delete: (u, ctx) => u.orgId === ctx.orgId,
+  },
+  posts: (p, ctx) => p.orgId === ctx.orgId,
+});
+```
+
+### 16.3 Behavior Notes
+
+- Row filters are enforced for SELECT/UPDATE/DELETE only (not required for INSERT).
+- Row-filtered schemas require `.withContext(...)` before SELECT/UPDATE/DELETE; otherwise query generation throws (fail closed).
+- For left joins, row filters are applied inside derived tables to preserve outer join semantics.
+- For updates, an additional safety predicate is applied so updates can’t “move” a row outside of the allowed filter scope via SET.
 
 [← Back to README](../README.md)
