@@ -1,6 +1,6 @@
 {
   "name": "@tinqerjs/better-sqlite3-adapter-integration",
-  "version": "0.0.22",
+  "version": "0.0.23",
   "private": true,
   "type": "module",
   "description": "SQLite integration tests for Tinqer using better-sqlite3",
