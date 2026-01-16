@@ -201,6 +201,26 @@ const createdUsers = await executeInsert(
 );
 ```
 
+**Example - Upsert (ON CONFLICT)**
+
+```typescript
+// PostgreSQL + SQLite: INSERT ... ON CONFLICT
+await executeInsert(
+  db,
+  schema,
+  (q, params: { email: string; name: string }) =>
+    q
+      .insertInto("users")
+      .values({ email: params.email, name: params.name })
+      .onConflict((u) => u.email)
+      .doUpdateSet((_existing, excluded) => ({ name: excluded.name })),
+  { email: "alice@example.com", name: "Alice" },
+);
+
+// Composite conflict targets are supported:
+// .onConflict((u) => u.email, (u) => u.name)
+```
+
 ### 1.3 defineUpdate, toSql & executeUpdate
 
 Creates UPDATE query plans, generates SQL, or executes queries with optional RETURNING clauses.

@@ -6,6 +6,7 @@
 import type {
   Expression,
   ColumnExpression,
+  ExcludedColumnExpression,
   ParameterExpression,
 } from "../../expressions/expression.js";
 
@@ -110,6 +111,13 @@ export function visitMemberAccess(
   if (node.object.type === "Identifier" && node.property.type === "Identifier" && !node.computed) {
     const objectName = (node.object as Identifier).name;
     const propertyName = (node.property as Identifier).name;
+
+    if (context.upsertExcludedParam && objectName === context.upsertExcludedParam) {
+      return {
+        type: "excludedColumn",
+        name: propertyName,
+      } as ExcludedColumnExpression;
+    }
 
     // Handle JavaScript built-in constants
     if (objectName === "Number") {

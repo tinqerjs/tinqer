@@ -127,6 +127,19 @@ const insert = toSql(
 );
 // insert.sql: INSERT INTO "users" ("name", "age") VALUES ($(name), $(age))
 
+// UPSERT (PostgreSQL + SQLite)
+const upsert = toSql(
+  defineInsert(schema, (q, params: { id: number; name: string; age: number }) =>
+    q
+      .insertInto("users")
+      .values({ id: params.id, name: params.name, age: params.age })
+      .onConflict((u) => u.id)
+      .doUpdateSet((_existing, excluded) => ({ name: excluded.name, age: excluded.age })),
+  ),
+  { id: 1, name: "Alice", age: 30 },
+);
+// upsert.sql: INSERT INTO "users" (...) VALUES (...) ON CONFLICT ("id") DO UPDATE SET ...
+
 // UPDATE
 const update = toSql(
   defineUpdate(schema, (q, params: { newAge: number; userId: number }) =>

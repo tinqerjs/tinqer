@@ -62,6 +62,46 @@ export function generateInsert(operation: InsertOperation, context: SqlContext):
 
   let sql = `INSERT INTO ${tableName} (${columns.join(", ")}) VALUES (${values.join(", ")})`;
 
+  if (operation.onConflict) {
+    if (!operation.onConflict.target || operation.onConflict.target.length === 0) {
+      throw new Error("INSERT ON CONFLICT requires at least one conflict column");
+    }
+
+    const target = operation.onConflict.target.map((col) => `"${col}"`).join(", ");
+    sql += ` ON CONFLICT (${target})`;
+
+    if (!operation.onConflict.action) {
+      throw new Error("INSERT ON CONFLICT requires doNothing() or doUpdateSet()");
+    }
+
+    if (operation.onConflict.action.type === "nothing") {
+      sql += ` DO NOTHING`;
+    } else {
+      const assignments: string[] = [];
+
+      if (operation.onConflict.action.assignments.type === "object") {
+        for (const [column, valueExpr] of Object.entries(
+          operation.onConflict.action.assignments.properties,
+        )) {
+          if (shouldSkipValue(valueExpr, context)) {
+            continue;
+          }
+          const value = generateExpression(valueExpr, context);
+          assignments.push(`"${column}" = ${value}`);
+        }
+      }
+
+      if (assignments.length === 0) {
+        throw new Error(
+          "INSERT ON CONFLICT DO UPDATE must specify at least one column assignment. " +
+            "All provided values were undefined.",
+        );
+      }
+
+      sql += ` DO UPDATE SET ${assignments.join(", ")}`;
+    }
+  }
+
   // SQLite supports RETURNING clause since version 3.35.0
   if (operation.returning !== undefined) {
     // Handle AllColumnsExpression (identity function like .returning(u => u))

@@ -11,6 +11,7 @@ import type {
   InExpression,
   IsNullExpression,
   ColumnExpression,
+  ExcludedColumnExpression,
   ConstantExpression,
   ParameterExpression,
   ArithmeticExpression,
@@ -108,6 +109,8 @@ export function generateValueExpression(expr: ValueExpression, context: SqlConte
   switch (expr.type) {
     case "column":
       return generateColumnExpression(expr as ColumnExpression, context);
+    case "excludedColumn":
+      return generateExcludedColumnExpression(expr as ExcludedColumnExpression);
     case "constant":
       return generateConstantExpression(expr as ConstantExpression);
     case "param":
@@ -135,6 +138,10 @@ export function generateValueExpression(expr: ValueExpression, context: SqlConte
         `Unsupported value expression type: ${(expr as ValueExpression & { type: string }).type}`,
       );
   }
+}
+
+function generateExcludedColumnExpression(expr: ExcludedColumnExpression): string {
+  return `EXCLUDED."${expr.name}"`;
 }
 
 /**
@@ -872,6 +879,7 @@ function isBooleanExpression(expr: Expression): expr is BooleanExpression {
 function isValueExpression(expr: Expression): expr is ValueExpression {
   return [
     "column",
+    "excludedColumn",
     "constant",
     "param",
     "arithmetic",

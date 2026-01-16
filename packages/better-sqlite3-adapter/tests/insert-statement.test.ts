@@ -191,6 +191,153 @@ describe("INSERT Statement Generation (SQLite)", () => {
     });
   });
 
+  describe("INSERT with ON CONFLICT (Upsert)", () => {
+    it("should generate INSERT with ON CONFLICT DO NOTHING", () => {
+      const result = toSql(
+        defineInsert(schema, (q) =>
+          q
+            .insertInto("users")
+            .values({
+              name: "Alice",
+              email: "alice@example.com",
+            })
+            .onConflict((u) => u.email)
+            .doNothing(),
+        ),
+        {},
+      );
+
+      assert.equal(
+        result.sql,
+        `INSERT INTO "users" ("name", "email") VALUES (@__p1, @__p2) ON CONFLICT ("email") DO NOTHING`,
+      );
+      assert.deepEqual(result.params, {
+        __p1: "Alice",
+        __p2: "alice@example.com",
+      });
+    });
+
+    it("should generate INSERT with ON CONFLICT DO NOTHING using multiple target columns", () => {
+      const result = toSql(
+        defineInsert(schema, (q) =>
+          q
+            .insertInto("users")
+            .values({
+              name: "Alice",
+              email: "alice@example.com",
+            })
+            .onConflict((u) => u.email, (u) => u.name)
+            .doNothing(),
+        ),
+        {},
+      );
+
+      assert.equal(
+        result.sql,
+        `INSERT INTO "users" ("name", "email") VALUES (@__p1, @__p2) ON CONFLICT ("email", "name") DO NOTHING`,
+      );
+      assert.deepEqual(result.params, {
+        __p1: "Alice",
+        __p2: "alice@example.com",
+      });
+    });
+
+    it("should generate INSERT with ON CONFLICT DO UPDATE SET using excluded", () => {
+      const result = toSql(
+        defineInsert(schema, (q) =>
+          q
+            .insertInto("users")
+            .values({
+              name: "Alice",
+              age: 30,
+              email: "alice@example.com",
+            })
+            .onConflict((u) => u.email)
+            .doUpdateSet((_existing, excluded) => ({
+              name: excluded.name,
+              age: excluded.age,
+            })),
+        ),
+        {},
+      );
+
+      assert.equal(
+        result.sql,
+        `INSERT INTO "users" ("name", "age", "email") VALUES (@__p1, @__p2, @__p3) ON CONFLICT ("email") DO UPDATE SET "name" = excluded."name", "age" = excluded."age"`,
+      );
+      assert.deepEqual(result.params, {
+        __p1: "Alice",
+        __p2: 30,
+        __p3: "alice@example.com",
+      });
+    });
+
+    it("should generate INSERT with ON CONFLICT DO UPDATE SET using multiple target columns", () => {
+      const result = toSql(
+        defineInsert(schema, (q) =>
+          q
+            .insertInto("users")
+            .values({
+              name: "Alice",
+              age: 30,
+              email: "alice@example.com",
+            })
+            .onConflict((u) => u.email, (u) => u.name)
+            .doUpdateSet((_existing, excluded) => ({
+              age: excluded.age,
+            })),
+        ),
+        {},
+      );
+
+      assert.equal(
+        result.sql,
+        `INSERT INTO "users" ("name", "age", "email") VALUES (@__p1, @__p2, @__p3) ON CONFLICT ("email", "name") DO UPDATE SET "age" = excluded."age"`,
+      );
+      assert.deepEqual(result.params, {
+        __p1: "Alice",
+        __p2: 30,
+        __p3: "alice@example.com",
+      });
+    });
+
+    it("should generate INSERT with ON CONFLICT DO UPDATE SET and RETURNING", () => {
+      const result = toSql(
+        defineInsert(schema, (q) =>
+          q
+            .insertInto("users")
+            .values({
+              name: "Alice",
+              age: 30,
+              email: "alice@example.com",
+            })
+            .onConflict((u) => u.email)
+            .doUpdateSet((_existing, excluded) => ({
+              name: excluded.name,
+            }))
+            .returning((u) => u.id),
+        ),
+        {},
+      );
+
+      assert.equal(
+        result.sql,
+        `INSERT INTO "users" ("name", "age", "email") VALUES (@__p1, @__p2, @__p3) ON CONFLICT ("email") DO UPDATE SET "name" = excluded."name" RETURNING "id"`,
+      );
+    });
+
+    it("should throw if ON CONFLICT has no action", () => {
+      assert.throws(() => {
+        toSql(
+          defineInsert(schema, (q) =>
+            q.insertInto("users").values({ name: "Alice" }).onConflict((u) => u.email),
+          ),
+          {},
+        );
+      }, /ON CONFLICT requires doNothing\(\) or doUpdateSet\(\)/);
+    });
+  });
+
   describe("INSERT with special values", () => {
     it("should handle boolean values (converted to 1/0 in SQLite)", () => {
       const result = toSql(
