@@ -3,7 +3,11 @@
  * Wraps the OXC WASM parser for JavaScript/TypeScript parsing
  */
 
-import { parseSync } from "oxc-parser";
+import { parseSync, type ParserOptions } from "oxc-parser";
+
+const DEFAULT_PARSER_OPTIONS: ParserOptions = {
+  sourceType: "module",
+};
 
 /**
  * Parses JavaScript/TypeScript code using OXC parser
@@ -12,9 +16,7 @@ import { parseSync } from "oxc-parser";
  */
 export function parseJavaScript(code: string): unknown {
   try {
-    const result = parseSync("query.ts", code, {
-      sourceType: "module",
-    });
+    const result = parseSync("query.ts", code, DEFAULT_PARSER_OPTIONS);
 
     if (result.errors.length > 0) {
       console.error("Parse errors:", result.errors);

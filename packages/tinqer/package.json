@@ -1,6 +1,6 @@
 {
   "name": "@tinqerjs/tinqer",
-  "version": "0.0.23",
+  "version": "0.0.24",
   "description": "LINQ to SQL for TypeScript",
   "type": "module",
   "main": "./dist/index.js",
@@ -20,7 +20,7 @@
     "lint:fix": "eslint src tests --ext .ts --fix"
   },
   "dependencies": {
-    "oxc-parser": "^0.90.0"
+    "oxc-parser": "0.108.0"
   },
   "devDependencies": {
     "@types/chai": "5.2.2",
