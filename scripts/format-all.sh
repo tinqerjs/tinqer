@@ -15,13 +15,27 @@ fi
 
 # Run prettier on all files
 if [ -n "$CHECK_FLAG" ]; then
-  ./node_modules/.bin/prettier $CHECK_FLAG \
-    "**/*.{js,jsx,ts,tsx,json,md,yml,yaml}" \
-    --ignore-path .prettierignore
+  git ls-files -z --cached --others --exclude-standard -- \
+    "*.js" \
+    "*.jsx" \
+    "*.ts" \
+    "*.tsx" \
+    "*.json" \
+    "*.md" \
+    "*.yml" \
+    "*.yaml" \
+    | xargs -0 -r ./node_modules/.bin/prettier $CHECK_FLAG --ignore-path .prettierignore
 else
-  ./node_modules/.bin/prettier --write \
-    "**/*.{js,jsx,ts,tsx,json,md,yml,yaml}" \
-    --ignore-path .prettierignore
+  git ls-files -z --cached --others --exclude-standard -- \
+    "*.js" \
+    "*.jsx" \
+    "*.ts" \
+    "*.tsx" \
+    "*.json" \
+    "*.md" \
+    "*.yml" \
+    "*.yaml" \
+    | xargs -0 -r ./node_modules/.bin/prettier --write --ignore-path .prettierignore
 fi
 
 echo "Formatting complete!"

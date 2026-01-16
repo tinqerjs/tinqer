@@ -5,3 +5,5 @@ package-lock.json
 coverage
 .git
 *.log
+devenv/pgdata/
+devenv/pgdata/**

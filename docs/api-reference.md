@@ -14,6 +14,8 @@ Reference for adapter execution helpers, typed contexts, and query utilities.
   - [1.5 ExecuteOptions & SqlResult](#15-executeoptions--sqlresult)
 - [2. Type-Safe Contexts](#2-type-safe-contexts)
   - [2.1 createSchema](#21-createschema)
+  - [2.2 withRowFilters](#22-withrowfilters)
+  - [2.3 withContext](#23-withcontext)
 - [3. Helper Utilities](#3-helper-utilities)
   - [3.1 createQueryHelpers](#31-createqueryhelpers)
 
@@ -418,6 +420,46 @@ const results = await executeSelect(
   {},
 );
 ```
+
+### 2.2 withRowFilters
+
+Attaches row-level predicates to a schema so that SELECT/UPDATE/DELETE operations automatically include them (RLS-like behavior for query generation).
+
+Filters are provided per table, and **all tables must be covered**. For tables that should not be scoped by row filters, use `null`.
+
+```typescript
+import { createSchema } from "@tinqerjs/tinqer";
+
+interface Schema {
+  users: { id: number; orgId: number; email: string };
+  posts: { id: number; orgId: number; title: string };
+}
+
+type PermisoContext = { orgId: number };
+
+const baseSchema = createSchema<Schema>();
+
+const permisoSchema = baseSchema.withRowFilters<PermisoContext>({
+  users: (u, ctx) => u.orgId === ctx.orgId,
+  posts: (p, ctx) => p.orgId === ctx.orgId,
+});
+```
+
+Notes:
+
+- Row filters are enforced for SELECT/UPDATE/DELETE only (not required for INSERT).
+- If a row-filtered schema is used without context binding, it throws (fail closed).
+- Unrestricted access is done by using the original/base schema directly.
+
+### 2.3 withContext
+
+Binds a concrete context object to a row-filtered schema (typically per request).
+
+```typescript
+const schema = permisoSchema.withContext({ orgId: 7 });
+```
+
+Once bound, you can pass the schema to `defineSelect` / `executeSelect` / `toSql` (and the UPDATE/DELETE equivalents) and the policy is applied automatically.
 
 ---
 

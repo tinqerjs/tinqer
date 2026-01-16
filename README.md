@@ -235,6 +235,40 @@ toSql(plan, { baseAge: 18, maxAge: 65 });
 
 Composition works with all operations: `defineSelect`, `defineInsert`, `defineUpdate`, `defineDelete`.
 
+### Row Filters
+
+Row filters let you attach row-level predicates to a schema so that **SELECT/UPDATE/DELETE** automatically include them (useful for authorization scoping in systems like Permiso). This is enforced at plan finalization time and **fails closed** if you forget to bind context.
+
+```typescript
+import { createSchema } from "@tinqerjs/tinqer";
+import { executeSelect } from "@tinqerjs/pg-promise-adapter";
+
+interface Schema {
+  users: { id: number; orgId: number; email: string };
+  posts: { id: number; orgId: number; title: string };
+}
+
+type PermisoContext = { orgId: number };
+
+const dangerousUnrestrictedSchema = createSchema<Schema>();
+
+const permisoSchema = dangerousUnrestrictedSchema.withRowFilters<PermisoContext>({
+  users: (u, ctx) => u.orgId === ctx.orgId,
+  posts: (p, ctx) => p.orgId === ctx.orgId,
+});
+
+const schema = permisoSchema.withContext({ orgId: 7 });
+
+// Any SELECT/UPDATE/DELETE using `schema` will include the row filter automatically.
+await executeSelect(db, schema, (q) => q.from("posts"), {});
+```
+
+Notes:
+
+- Filters must be provided for every table (set a table’s filter to `null` to opt out).
+- Row filters are not automatically applied to INSERT statements.
+- Unrestricted access is done by using the base schema (`dangerousUnrestrictedSchema`) directly.
+
 ### Joins
 
 Tinqer mirrors LINQ semantics. Inner joins have a dedicated operator; left outer and cross joins follow the familiar `groupJoin`/`selectMany` patterns from C#.
