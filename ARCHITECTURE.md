@@ -713,12 +713,16 @@ type QueryFunction<TParams, TResult> = (
 
 ```typescript
 // Main parsing function
-function parseQuery<TParams, TResult>(
-  queryBuilder: (params: TParams) => Queryable<TResult> | TerminalQuery<TResult>,
-): QueryOperation;
+function parseQuery<TContext, TParams, TQuery>(
+  builder:
+    | ((ctx: TContext) => TQuery)
+    | ((ctx: TContext, params: TParams) => TQuery)
+    | ((ctx: TContext, params: TParams, helpers: Helpers) => TQuery),
+  options?: ParseQueryOptions,
+): ParseResult | null;
 
 // Parses individual lambdas
-function parseLambda(fn: Function): Expression;
+function parseLambdaExpression(fn: Function, methodName: string): LambdaExpression;
 
 // Converts AST to expressions
 function convertAstToExpression(ast: unknown, context: Context): Expression;
@@ -738,13 +742,13 @@ function defineSelect<TSchema, TParams, TResult>(
     params: TParams,
     helpers: Helpers,
   ) => Queryable<TResult> | TerminalQuery<TResult>,
-  paramDefaults?: TParams,
+  options?: ParseQueryOptions,
 ): SelectPlanHandle<TResult, TParams> | SelectTerminalHandle<TResult, TParams>;
 
 function defineInsert<TSchema, TParams, TTable, TReturning>(
   schema: DatabaseSchema<TSchema>,
   queryBuilder: (q: QueryBuilder<TSchema>, params: TParams, helpers: Helpers) => InsertQuery,
-  paramDefaults?: TParams,
+  options?: ParseQueryOptions,
 ): InsertPlanHandle<TTable, TReturning, TParams>;
 
 // Execution functions (in adapters)

@@ -22,6 +22,7 @@ Complete reference for all query operations, parameters, and CRUD functionality 
 - [3. Ordering](#3-ordering)
   - [3.1 Single Key Ascending](#31-single-key-ascending)
   - [3.2 Mixed Ordering](#32-mixed-ordering)
+  - [3.3 Reverse](#33-reverse)
 - [4. Distinct Operations](#4-distinct-operations)
 - [5. Pagination](#5-pagination)
   - [5.1 Offset/Limit Pattern](#51-offsetlimit-pattern)
@@ -46,6 +47,7 @@ Complete reference for all query operations, parameters, and CRUD functionality 
 - [10. Quantifiers](#10-quantifiers)
   - [10.1 Any Operation](#101-any-operation)
   - [10.2 All Operation](#102-all-operation)
+  - [10.3 Contains Operation](#103-contains-operation)
 - [11. Element Retrieval](#11-element-retrieval)
 - [12. Materialisation](#12-materialisation)
 - [13. Parameters and Auto-Parameterisation](#13-parameters-and-auto-parameterisation)
@@ -456,6 +458,32 @@ SELECT * FROM "users" ORDER BY "departmentId" ASC, "salary" DESC, "name" ASC
 -- SQLite
 SELECT * FROM "users" ORDER BY "departmentId" ASC, "salary" DESC, "name" ASC
 ```
+
+### 3.3 Reverse
+
+`reverse()` flips the effective ordering. If an explicit `orderBy`/`thenBy` chain exists, Tinqer inverts the direction of each ordering. If no `orderBy` exists, Tinqer emits `ORDER BY 1 DESC`.
+
+```typescript
+const reversed = toSql(
+  defineSelect(schema, (q) =>
+    q
+      .from("users")
+      .orderBy((u) => u.name)
+      .reverse(),
+  ),
+  {},
+);
+```
+
+```sql
+-- PostgreSQL
+SELECT * FROM "users" ORDER BY "name" DESC
+
+-- SQLite
+SELECT * FROM "users" ORDER BY "name" DESC
+```
+
+> **Note:** `reverse()` after `take()`/`skip()` is not supported. Apply `reverse()` before pagination.
 
 ---
 
@@ -1458,6 +1486,36 @@ SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM "users" WHERE NOT ("active" = @__p1)) 
 
 ---
 
+### 10.3 Contains Operation
+
+`contains(value)` is a terminal operation that returns `true`/`false`. It requires a scalar `.select(...)` projection (for example, `.select((u) => u.id)`), and is not supported with `take()`/`skip()`.
+
+```typescript
+const hasId = toSql(
+  defineSelect(schema, (q) =>
+    q
+      .from("users")
+      .select((u) => u.id)
+      .contains(1),
+  ),
+  {},
+);
+```
+
+```sql
+-- PostgreSQL
+SELECT CASE WHEN EXISTS(SELECT 1 FROM (SELECT "id" AS "__tinqer_value" FROM "users") AS "__tinqer_contains" WHERE "__tinqer_contains"."__tinqer_value" = $(__p1)) THEN 1 ELSE 0 END
+```
+
+```sql
+-- SQLite
+SELECT CASE WHEN EXISTS(SELECT 1 FROM (SELECT "id" AS "__tinqer_value" FROM "users") AS "__tinqer_contains" WHERE "__tinqer_contains"."__tinqer_value" = @__p1) THEN 1 ELSE 0 END
+```
+
+```json
+{ "__p1": 1 }
+```
+
 ## 11. Element Retrieval
 
 Methods `first`, `firstOrDefault`, `single`, `singleOrDefault`, `last`, and `lastOrDefault` retrieve single elements.
@@ -1476,17 +1534,17 @@ const newestUser = toSql(
 
 ```sql
 -- PostgreSQL
-SELECT * FROM "users" ORDER BY "createdAt" ASC LIMIT 1
+SELECT * FROM "users" ORDER BY "createdAt" DESC LIMIT 1
 ```
 
 ```sql
 -- SQLite
-SELECT * FROM "users" ORDER BY "createdAt" ASC LIMIT 1
+SELECT * FROM "users" ORDER BY "createdAt" DESC LIMIT 1
 ```
 
 - `single` ensures at most one result
-- `firstOrDefault` / `singleOrDefault` return `NULL` when no rows match
-- `last` and `lastOrDefault` automatically reverse ordering when no explicit `orderBy` exists
+- `firstOrDefault` / `singleOrDefault` / `lastOrDefault` return `null` when no rows match
+- `last` and `lastOrDefault` reverse ordering (or emit `ORDER BY 1 DESC` when no explicit `orderBy` exists)
 
 ---
 
@@ -1809,7 +1867,7 @@ const insert = toSql(
 
 ### 14.2 UPDATE Statements
 
-The `update` function creates UPDATE operations. The `.set()` method uses direct object syntax (no lambda wrapping required).
+The `update` function creates UPDATE operations. The `.set()` method accepts either an object literal or an arrow function returning an object literal (to support column self-reference).
 
 #### Basic UPDATE
 
@@ -1845,6 +1903,34 @@ WHERE "id" = @__p3
 ```
 
 > **Tip:** If any property in the `.set()` object evaluates to `undefined` (for example because a parameter was omitted), Tinqer simply skips that column. Explicit `null` values still generate `SET column = NULL`. The query builder throws if every assignment resolves to `undefined`.
+
+#### UPDATE with Column Self-Reference
+
+```typescript
+const updateStmt = toSql(
+  defineUpdate(schema, (q, params: { userId: number; delta: number }) =>
+    q
+      .update("users")
+      .set((u) => ({ view_count: u.view_count + params.delta }))
+      .where((u) => u.id === params.userId),
+  ),
+  { userId: 1, delta: 1 },
+);
+```
+
+Generated SQL:
+
+```sql
+-- PostgreSQL
+UPDATE "users"
+SET "view_count" = ("view_count" + $(delta))
+WHERE "id" = $(userId)
+
+-- SQLite
+UPDATE "users"
+SET "view_count" = ("view_count" + @delta)
+WHERE "id" = @userId
+```
 
 #### UPDATE with External Parameters
 

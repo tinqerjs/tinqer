@@ -462,24 +462,31 @@ This means: Focus on clean, optimal implementations without worrying about exist
 ./scripts/format-all.sh --check # Check formatting without changing files
 
 # Run tests
-npm test                        # Run all tests
-npm run test:watch             # Run tests in watch mode
-npm run test:grep -- "pattern" # Run specific tests matching pattern
+npm test | tee .tests/run-<timestamp>.txt # Run all tests (save output)
+
+# Run tests for a specific workspace
+npm test --workspace @tinqerjs/tinqer
+npm test --workspace @tinqerjs/pg-promise-adapter
+npm test --workspace @tinqerjs/better-sqlite3-adapter
+npm test --workspace @tinqerjs/better-sqlite3-adapter-integration
+TINQER_PG_INTEGRATION=1 npm test --workspace @tinqerjs/pg-promise-adapter-integration
+
+# Run specific tests by grep (Mocha)
+npm test --workspace @tinqerjs/tinqer -- --grep "pattern"
 ```
 
 ### Testing Commands
 
 ```bash
-# Run specific tests (fast)
-npm run test:grep -- "pattern to match"
+# Run specific tests by grep within a workspace
+npm test --workspace @tinqerjs/tinqer -- --grep "pattern to match"
 
 # Examples:
-npm run test:grep -- "should handle COUNT with GROUP BY"
-npm run test:grep -- "WHERE"
-npm run test:grep -- "JOIN"
+npm test --workspace @tinqerjs/tinqer -- --grep "WHERE"
+npm test --workspace @tinqerjs/pg-promise-adapter -- --grep "JOIN"
 ```
 
-**IMPORTANT**: When running tests with mocha, always use `npm run test:grep -- "pattern"` from the root directory for specific tests. NEVER use `2>&1` redirection with mocha commands. Use `| tee` for output capture.
+**IMPORTANT**: When running tests with mocha, use `npm test --workspace <workspace> -- --grep "pattern"`. NEVER use `2>&1` redirection with mocha commands. Use `| tee` for output capture.
 
 ### Build & Lint Workflow
 
@@ -508,12 +515,32 @@ Key concepts:
 packages/
 ├── tinqer/                    # Core library with parser and query builder
 │   ├── src/
-│   │   ├── parser/           # OXC parser wrapper
-│   │   ├── converter/        # AST to expression tree converter
-│   │   ├── queryable/        # Fluent query API
-│   │   └── types/           # TypeScript type definitions
+│   │   ├── expressions/
+│   │   ├── linq/
+│   │   ├── parser/
+│   │   ├── plans/
+│   │   ├── policies/
+│   │   ├── query-tree/
+│   │   └── visitors/
 │   └── tests/
-└── pg-promise-adapter/    # PostgreSQL adapter using pg-promise
+├── pg-promise-adapter/         # PostgreSQL adapter using pg-promise
+│   ├── src/
+│   │   ├── generators/
+│   │   ├── expression-generator.ts
+│   │   ├── sql-generator.ts
+│   │   └── index.ts
+│   └── tests/
+├── better-sqlite3-adapter/     # SQLite adapter using better-sqlite3
+│   ├── src/
+│   │   ├── generators/
+│   │   ├── expression-generator.ts
+│   │   ├── sql-generator.ts
+│   │   └── index.ts
+│   └── tests/
+├── pg-promise-adapter-integration/
+│   └── tests/
+└── better-sqlite3-adapter-integration/
+    └── tests/
 ```
 
 ## Code Patterns
@@ -522,8 +549,8 @@ packages/
 
 ```typescript
 // Always include .js extension
-import { Queryable } from "./queryable/queryable.js";
-import type { Expression } from "./types/expressions.js";
+import { Queryable } from "./linq/queryable.js";
+import type { Expression } from "./expressions/expression.js";
 ```
 
 ### Expression Tree Pattern

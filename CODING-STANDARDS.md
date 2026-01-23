@@ -49,12 +49,12 @@ All code uses ES modules with `.js` extensions in imports.
 
 ```typescript
 // ✅ Good
-import { Expression } from "./types/expressions.js";
-import { parseExpression } from "./parser/parser.js";
+import type { Expression } from "./expressions/expression.js";
+import { parseQuery } from "./parser/parse-query.js";
 
 // ❌ Bad
-import { Expression } from "./types/expressions"; // Missing .js
-const parser = require("./parser"); // CommonJS
+import type { Expression } from "./expressions/expression"; // Missing .js
+const parser = require("./parser/parse-query"); // CommonJS
 ```
 
 ### No Dynamic Imports
@@ -63,10 +63,10 @@ Static imports only. No `await import()` or `import()` in code.
 
 ```typescript
 // ✅ Good
-import { SqlAdapter } from "./adapters/sql-adapter.js";
+import { parseQuery } from "./parser/parse-query.js";
 
 // ❌ Bad
-const adapter = await import("./adapters/sql-adapter.js");
+const parser = await import("./parser/parse-query.js");
 ```
 
 ## Design Patterns
@@ -130,18 +130,15 @@ export interface ParameterExpression {
 }
 ```
 
-### Type Over Interface
+### Use `type` for unions, `interface` for structures
 
-Use `type` for object types, `interface` only for extensible contracts.
+Use `type` for unions and type-level composition, and `interface` for structured data shapes (especially exported node types).
 
 ```typescript
-// ✅ Good - Type for data structures
-export type QueryOperation = {
-  type: "queryOperation";
-  operationType: string;
-};
+// ✅ Good - type for unions
+export type Expression = BooleanExpression | ValueExpression | ObjectExpression | ArrayExpression;
 
-// ❌ Bad - Interface for simple data
+// ✅ Good - interface for structured nodes
 export interface QueryOperation {
   type: "queryOperation";
   operationType: string;
@@ -193,25 +190,19 @@ export interface ParameterExpression {
 
 ## Error Handling
 
-### No Throwing in Library Code
+### Parser Failures vs User Errors
 
-Library functions should not throw. Return error states or use Result types.
+Prefer returning `null` (or a similar "no result" signal) for parse failures, and throw clear errors for invalid DSL usage (unsupported expressions, invalid query shapes, etc.).
 
 ```typescript
-// ✅ Good
-export function parseExpression(fn: Function): Expression | null {
+// ✅ Good - parseQuery returns null on parse failure
+export function parseQuery(/* ... */): ParseResult | null {
   try {
     // parsing logic
-    return expression;
+    return result;
   } catch {
     return null;
   }
-}
-
-// ❌ Bad
-export function parseExpression(fn: Function): Expression {
-  // parsing logic
-  throw new Error("Parse failed");
 }
 ```
 
@@ -236,16 +227,17 @@ const expected = {
 
 ### Test Organization
 
-- Unit tests in `tests/unit/`
-- Integration tests in `tests/integration/`
+- Core tests in `packages/tinqer/tests/`
+- Adapter tests in `packages/*-adapter/tests/`
+- Integration tests in `packages/*-adapter-integration/tests/`
 - Test files named `*.test.ts`
-- Helper utilities in `tests/utils/`
+- Helper utilities in `packages/tinqer/tests/test-utils/`
 
 ## Code Style
 
-### No Comments in Production Code
+### Comments
 
-Code should be self-documenting. Comments only for complex algorithms.
+Prefer self-documenting code. Use comments sparingly for complex intent or non-obvious constraints.
 
 ```typescript
 // ✅ Good - Self-documenting
