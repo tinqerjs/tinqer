@@ -425,6 +425,7 @@ export function defineSelect<
     "singleOrDefault",
     "last",
     "lastOrDefault",
+    "contains",
     "min",
     "max",
     "sum",

@@ -34,6 +34,7 @@ import type {
 import type { SelectContext } from "./context.js";
 import { createAutoParam } from "./context.js";
 import { isWindowFunctionCall, visitWindowFunction } from "../window/index.js";
+import { isBooleanExpression, isValueExpression } from "../utils.js";
 
 /**
  * Visit a projection expression in SELECT context
@@ -88,17 +89,42 @@ export function visitProjection(node: ASTExpression, context: SelectContext): Ex
     }
 
     case "LogicalExpression": {
-      // Null coalescing operator (??)
+      // Null coalescing operator (??) and value-defaulting (||)
       const logical = node as { operator: string; left: ASTExpression; right: ASTExpression };
-      if (logical.operator === "??") {
-        const left = visitProjection(logical.left, context);
-        const right = visitProjection(logical.right, context);
+      const left = visitProjection(logical.left, context);
+      const right = visitProjection(logical.right, context);
 
-        if (left && right) {
+      if (!left || !right) {
+        return null;
+      }
+
+      if (logical.operator === "??") {
+        if (isValueExpression(left) && isValueExpression(right)) {
           return {
             type: "coalesce",
             expressions: [left, right],
           } as ValueExpression;
+        }
+        return null;
+      }
+
+      if (logical.operator === "||") {
+        // Treat || as COALESCE when used in value context (common for defaults)
+        if (isValueExpression(left) && isValueExpression(right)) {
+          return {
+            type: "coalesce",
+            expressions: [left, right],
+          } as ValueExpression;
+        }
+
+        // Otherwise, allow boolean OR
+        if (isBooleanExpression(left) && isBooleanExpression(right)) {
+          return {
+            type: "logical",
+            operator: "or",
+            left: left as BooleanExpression,
+            right: right as BooleanExpression,
+          } as LogicalExpression;
         }
       }
       return null;

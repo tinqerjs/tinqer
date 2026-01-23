@@ -230,7 +230,10 @@ describe("INSERT Statement Generation", () => {
               name: "Alice",
               email: "alice@example.com",
             })
-            .onConflict((u) => u.email, (u) => u.name)
+            .onConflict(
+              (u) => u.email,
+              (u) => u.name,
+            )
             .doNothing(),
         ),
         {},
@@ -286,7 +289,10 @@ describe("INSERT Statement Generation", () => {
               age: 30,
               email: "alice@example.com",
             })
-            .onConflict((u) => u.email, (u) => u.name)
+            .onConflict(
+              (u) => u.email,
+              (u) => u.name,
+            )
             .doUpdateSet((_existing, excluded) => ({
               age: excluded.age,
             })),
@@ -334,7 +340,10 @@ describe("INSERT Statement Generation", () => {
       assert.throws(() => {
         toSql(
           defineInsert(schema, (q) =>
-            q.insertInto("users").values({ name: "Alice" }).onConflict((u) => u.email),
+            q
+              .insertInto("users")
+              .values({ name: "Alice" })
+              .onConflict((u) => u.email),
           ),
           {},
         );

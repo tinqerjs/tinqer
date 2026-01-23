@@ -18,7 +18,9 @@ export class Updatable<T> {
    * @param setSelector Object mapping columns to new values
    * @returns UpdatableWithSet for further chaining
    */
-  set(_setSelector: Partial<T>): UpdatableWithSet<T> {
+  set(_setSelector: Partial<T>): UpdatableWithSet<T>;
+  set(_setSelector: (row: T) => Partial<T>): UpdatableWithSet<T>;
+  set(_setSelector: Partial<T> | ((row: T) => Partial<T>)): UpdatableWithSet<T> {
     if (this.__hasSet) {
       throw new Error("set() can only be called once per UPDATE query");
     }

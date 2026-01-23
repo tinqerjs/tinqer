@@ -250,4 +250,52 @@ describe("Terminal Operations", () => {
       expect(result.params).to.deep.equal({});
     });
   });
+
+  describe("CONTAINS operations", () => {
+    it("should generate SQL for contains()", () => {
+      const result = toSql(
+        defineSelect(schema, (q) =>
+          q
+            .from("users")
+            .select((u) => u.id)
+            .contains(1),
+        ),
+        {},
+      );
+
+      expect(result.sql).to.equal(
+        'SELECT CASE WHEN EXISTS(SELECT 1 FROM (SELECT "id" AS "__tinqer_value" FROM "users") AS "__tinqer_contains" WHERE "__tinqer_contains"."__tinqer_value" = $(__p1)) THEN 1 ELSE 0 END',
+      );
+      expect(result.params).to.deep.equal({ __p1: 1 });
+    });
+
+    it("should throw when contains() is used with take()", () => {
+      expect(() =>
+        toSql(
+          defineSelect(schema, (q) =>
+            q
+              .from("users")
+              .select((u) => u.id)
+              .take(1)
+              .contains(1),
+          ),
+          {},
+        ),
+      ).to.throw(/contains\(\) is not supported with take\/skip/);
+    });
+
+    it("should throw when contains() is used with object projection", () => {
+      expect(() =>
+        toSql(
+          defineSelect(schema, (q, p: { value: { id: number } }) =>
+            q
+              .from("users")
+              .select((u) => ({ id: u.id }))
+              .contains(p.value),
+          ),
+          { value: { id: 1 } },
+        ),
+      ).to.throw(/contains\(\) requires a scalar \.select/);
+    });
+  });
 });

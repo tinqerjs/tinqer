@@ -192,7 +192,10 @@ describe("InsertPlanHandle", () => {
           name: "Alice",
           email: "alice@example.com",
         })
-        .onConflict((u) => u.email, (u) => u.name);
+        .onConflict(
+          (u) => u.email,
+          (u) => u.name,
+        );
 
       const finalized = plan.doNothing().finalize({});
       const insertOp = finalized.operation as InsertOperation;

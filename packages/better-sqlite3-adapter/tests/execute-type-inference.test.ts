@@ -72,27 +72,25 @@ function typeTests() {
     deptId: number;
   } = executeSelect(mockDb, schema, (q) => q.from("users").first(), {});
 
-  // firstOrDefault() returns item or undefined
-  const maybeUser:
-    | {
-        id: number;
-        name: string;
-        age: number;
-        email: string | null;
-        isActive: boolean;
-        role: string;
-        department: string;
-        salary: number;
-        city: string;
-        country: string;
-        phone: string;
-        isDeleted: boolean;
-        createdAt: Date;
-        username: string;
-        active: boolean;
-        deptId: number;
-      }
-    | undefined = executeSelect(mockDb, schema, (q) => q.from("users").firstOrDefault(), {});
+  // firstOrDefault() returns item or null
+  const maybeUser: {
+    id: number;
+    name: string;
+    age: number;
+    email: string | null;
+    isActive: boolean;
+    role: string;
+    department: string;
+    salary: number;
+    city: string;
+    country: string;
+    phone: string;
+    isDeleted: boolean;
+    createdAt: Date;
+    username: string;
+    active: boolean;
+    deptId: number;
+  } | null = executeSelect(mockDb, schema, (q) => q.from("users").firstOrDefault(), {});
 
   // count() returns number
   const count: number = executeSelect(mockDb, schema, (q) => q.from("users").count(), {});

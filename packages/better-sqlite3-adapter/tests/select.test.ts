@@ -32,7 +32,17 @@ describe("SELECT SQL Generation", () => {
     expect(result.sql).to.equal('SELECT "id" AS "userId", "name" AS "userName" FROM "users"');
   });
 
-  // Test removed: Computed values with expressions no longer supported in SELECT projections
+  it("should generate SELECT with computed values in projections", () => {
+    const result = toSql(
+      defineSelect(schema, (q) =>
+        q.from("products").select((p) => ({ discounted: p.price * 0.9 })),
+      ),
+      {},
+    );
+
+    expect(result.sql).to.equal('SELECT ("price" * @__p1) AS "discounted" FROM "products"');
+    expect(result.params).to.deep.equal({ __p1: 0.9 });
+  });
 
   it("should generate SELECT after WHERE", () => {
     const result = toSql(

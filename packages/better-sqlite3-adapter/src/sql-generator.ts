@@ -27,6 +27,7 @@ import type {
   JoinOperation,
   AnyOperation,
   AllOperation,
+  ContainsOperation,
   InsertOperation,
   UpdateOperation,
   DeleteOperation,
@@ -92,6 +93,12 @@ export function generateSql(operation: QueryOperation, params: unknown): string 
     return generateExistsQuery(operations, anyOp || allOp, context);
   }
 
+  // Check for CONTAINS operation - it needs special handling
+  const containsOp = operations.find((op) => op.operationType === "contains") as ContainsOperation;
+  if (containsOp) {
+    return generateContainsQuery(operations, containsOp, context);
+  }
+
   // Find terminal operations early as they affect other clauses
   const firstOp = operations.find(
     (op) => op.operationType === "first" || op.operationType === "firstOrDefault",
@@ -102,6 +109,30 @@ export function generateSql(operation: QueryOperation, params: unknown): string 
   const lastOp = operations.find(
     (op) => op.operationType === "last" || op.operationType === "lastOrDefault",
   ) as LastOperation | LastOrDefaultOperation;
+
+  const reverseIndices: number[] = [];
+  operations.forEach((op, idx) => {
+    if (op.operationType === "reverse") {
+      reverseIndices.push(idx);
+    }
+  });
+
+  const hasReverse = reverseIndices.length % 2 === 1;
+  const lastReverseIndex =
+    reverseIndices.length > 0 ? reverseIndices[reverseIndices.length - 1]! : -1;
+
+  const takeIndex = operations.findIndex((op) => op.operationType === "take");
+  const skipIndex = operations.findIndex((op) => op.operationType === "skip");
+
+  if (
+    hasReverse &&
+    ((takeIndex !== -1 && lastReverseIndex > takeIndex) ||
+      (skipIndex !== -1 && lastReverseIndex > skipIndex))
+  ) {
+    throw new Error(
+      "reverse() after take/skip is not supported. Apply reverse() before take/skip.",
+    );
+  }
 
   // Build SQL fragments in correct order
   const fragments: string[] = [];
@@ -231,8 +262,8 @@ export function generateSql(operation: QueryOperation, params: unknown): string 
   const orderByOp = operations.find((op) => op.operationType === "orderBy") as OrderByOperation;
 
   if (orderByOp) {
-    // Check if we need to reverse for LAST operation
-    const shouldReverse = !!lastOp;
+    // Reverse ORDER BY for LAST and/or reverse()
+    const shouldReverse = !!lastOp !== hasReverse;
 
     let orderByClause = generateOrderBy(
       {
@@ -255,6 +286,8 @@ export function generateSql(operation: QueryOperation, params: unknown): string 
     });
 
     fragments.push(orderByClause);
+  } else if (hasReverse) {
+    fragments.push("ORDER BY 1 DESC");
   }
 
   // Process terminal operations (LIMIT clauses)
@@ -378,6 +411,87 @@ function generateExistsQuery(
     // But we already added the NOT to the predicate above
     return `SELECT CASE WHEN NOT EXISTS(${innerQuery}) THEN 1 ELSE 0 END`;
   }
+}
+
+/**
+ * Generate EXISTS query for CONTAINS operation
+ */
+function generateContainsQuery(
+  operations: QueryOperation[],
+  terminalOp: ContainsOperation,
+  context: SqlContext,
+): string {
+  if (operations.some((op) => op.operationType === "take" || op.operationType === "skip")) {
+    throw new Error("contains() is not supported with take/skip.");
+  }
+
+  // Find the SELECT closest to the terminal operation (the effective projection)
+  let selectOp: SelectOperation | undefined;
+  for (let i = operations.length - 1; i >= 0; i--) {
+    const op = operations[i];
+    if (op?.operationType === "select") {
+      selectOp = op as SelectOperation;
+      break;
+    }
+  }
+
+  if (!selectOp || !selectOp.selector) {
+    throw new Error("contains() requires a scalar .select(...) projection.");
+  }
+
+  if (selectOp.selector.type === "object" || selectOp.selector.type === "allColumns") {
+    throw new Error("contains() requires a scalar .select(...) projection.");
+  }
+
+  // Find GROUP BY early and store in context for SELECT generation
+  const groupByOp = operations.find((op) => op.operationType === "groupBy") as GroupByOperation;
+  if (groupByOp) {
+    context.groupByKey = groupByOp.keySelector;
+  }
+
+  // Process JOIN operations to determine if we need table aliases
+  const joinOps = operations.filter((op) => op.operationType === "join") as JoinOperation[];
+  if (joinOps.length > 0) {
+    context.hasJoins = true;
+  }
+
+  const fromOp = operations.find((op) => op.operationType === "from") as FromOperation;
+  if (!fromOp) {
+    throw new Error("Query must have a FROM operation");
+  }
+
+  const fromClause = generateFrom(fromOp, context);
+  const joinClauses = joinOps.map((joinOp) => generateJoin(joinOp, context));
+
+  const projection = generateExpression(selectOp.selector, context);
+
+  const fragments: string[] = [];
+  fragments.push(`SELECT ${projection} AS "__tinqer_value"`);
+  fragments.push(fromClause);
+  fragments.push(...joinClauses);
+
+  const whereOps = operations.filter((op) => op.operationType === "where") as WhereOperation[];
+  const wherePredicates = whereOps.map((whereOp) =>
+    generateBooleanExpression(whereOp.predicate, context),
+  );
+
+  if (wherePredicates.length > 0) {
+    fragments.push(`WHERE ${wherePredicates.join(" AND ")}`);
+  }
+
+  if (groupByOp) {
+    fragments.push(generateGroupBy(groupByOp, context));
+  }
+
+  const innerQuery = fragments.join(" ");
+  const containsValue = generateExpression(terminalOp.value, context);
+
+  return (
+    `SELECT CASE WHEN EXISTS(` +
+    `SELECT 1 FROM (${innerQuery}) AS "__tinqer_contains" ` +
+    `WHERE "__tinqer_contains"."__tinqer_value" = ${containsValue}` +
+    `) THEN 1 ELSE 0 END`
+  );
 }
 
 /**

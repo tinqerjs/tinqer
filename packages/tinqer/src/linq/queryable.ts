@@ -125,24 +125,24 @@ export class Queryable<T> {
     return new TerminalQuery<T>();
   }
 
-  firstOrDefault(_predicate?: (_item: T) => boolean): TerminalQuery<T | undefined> {
-    return new TerminalQuery<T | undefined>();
+  firstOrDefault(_predicate?: (_item: T) => boolean): TerminalQuery<T | null> {
+    return new TerminalQuery<T | null>();
   }
 
   single(_predicate?: (_item: T) => boolean): TerminalQuery<T> {
     return new TerminalQuery<T>();
   }
 
-  singleOrDefault(_predicate?: (_item: T) => boolean): TerminalQuery<T | undefined> {
-    return new TerminalQuery<T | undefined>();
+  singleOrDefault(_predicate?: (_item: T) => boolean): TerminalQuery<T | null> {
+    return new TerminalQuery<T | null>();
   }
 
   last(_predicate?: (_item: T) => boolean): TerminalQuery<T> {
     return new TerminalQuery<T>();
   }
 
-  lastOrDefault(_predicate?: (_item: T) => boolean): TerminalQuery<T | undefined> {
-    return new TerminalQuery<T | undefined>();
+  lastOrDefault(_predicate?: (_item: T) => boolean): TerminalQuery<T | null> {
+    return new TerminalQuery<T | null>();
   }
 
   contains(_value: T): TerminalQuery<boolean> {

@@ -395,7 +395,11 @@ function appendDoUpdateSet<TRecord, TParams>(
         } as ASTObjectExpression);
 
   const call = createMethodCall("doUpdateSet", [arg]);
-  const result = visitDoUpdateSetOperation(call, state.operation as InsertOperation, visitorContext);
+  const result = visitDoUpdateSetOperation(
+    call,
+    state.operation as InsertOperation,
+    visitorContext,
+  );
 
   if (!result) {
     throw new Error("Failed to append doUpdateSet to insert plan");
