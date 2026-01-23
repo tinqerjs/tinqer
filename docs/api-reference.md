@@ -38,29 +38,46 @@ Creates SELECT query plans, generates SQL, or executes queries.
 
 ```typescript
 // Plan definition (from @tinqerjs/tinqer)
-function defineSelect<TSchema, TParams, TResult>(
+function defineSelect<TSchema, TParams, TRecord>(
   schema: DatabaseSchema<TSchema>,
-  queryBuilder: (
+  builder: (
     q: QueryBuilder<TSchema>,
     params: TParams,
     helpers: QueryHelpers,
-  ) => Queryable<TResult> | OrderedQueryable<TResult> | TerminalQuery<TResult>,
-  paramDefaults?: TParams,
-): SelectPlanHandle<TResult, TParams> | SelectTerminalHandle<TResult, TParams>;
+  ) => Queryable<TRecord> | OrderedQueryable<TRecord>,
+  options?: ParseQueryOptions,
+): SelectPlanHandle<TRecord, TParams>;
+
+function defineSelect<TSchema, TParams, TResult>(
+  schema: DatabaseSchema<TSchema>,
+  builder: (
+    q: QueryBuilder<TSchema>,
+    params: TParams,
+    helpers: QueryHelpers,
+  ) => TerminalQuery<TResult>,
+  options?: ParseQueryOptions,
+): SelectTerminalHandle<TResult, TParams>;
 
 // SQL generation (from adapter packages)
 function toSql<TParams>(
   plan: SelectPlanHandle<unknown, TParams> | SelectTerminalHandle<unknown, TParams>,
   params: TParams,
-): { sql: string; params: TParams & Record<string, unknown> };
+): { sql: string; params: Record<string, unknown> };
 
 // Execution (from adapter packages)
-async function executeSelect<TResult, TParams>(
+async function executeSelect<TSchema, TParams, TQuery>(
   db: PgDatabase | BetterSqlite3Database,
-  plan: SelectPlanHandle<TResult, TParams> | SelectTerminalHandle<TResult, TParams>,
+  schema: DatabaseSchema<TSchema>,
+  builder: (q: QueryBuilder<TSchema>, params: TParams, helpers: QueryHelpers) => TQuery,
   params: TParams,
-  options?: ExecuteOptions,
-): Promise<TResult[] | TResult>;
+  options?: ExecuteOptions & ParseQueryOptions,
+): Promise<
+  TQuery extends TerminalQuery<infer TResult>
+    ? TResult
+    : TQuery extends Queryable<infer TRecord> | OrderedQueryable<infer TRecord>
+      ? TRecord[]
+      : never
+>;
 ```
 
 **Example - SQL Generation**
@@ -113,6 +130,34 @@ const users = await executeSelect(
 // Returns: Array of user objects
 ```
 
+**Notes**
+
+- `firstOrDefault` / `singleOrDefault` / `lastOrDefault` return `null` when no rows match.
+- `reverse()` flips the effective ordering. If no `orderBy` is present, Tinqer generates `ORDER BY 1 DESC`. `reverse()` after `take()`/`skip()` is not supported.
+- `contains(value)` is a terminal operation on scalar queries (use `.select(...)` first). `contains()` is not supported with `take()`/`skip()`.
+
+**Example - reverse()**
+
+```typescript
+const newestFirst = defineSelect(schema, (q) =>
+  q
+    .from("users")
+    .orderBy((u) => u.id)
+    .reverse(),
+);
+```
+
+**Example - contains()**
+
+```typescript
+const hasUserId = defineSelect(schema, (q, p: { id: number }) =>
+  q
+    .from("users")
+    .select((u) => u.id)
+    .contains(p.id),
+);
+```
+
 ### 1.2 defineInsert, toSql & executeInsert
 
 Creates INSERT query plans, generates SQL, or executes queries with optional RETURNING clauses.
@@ -123,26 +168,37 @@ Creates INSERT query plans, generates SQL, or executes queries with optional RET
 // Plan definition (from @tinqerjs/tinqer)
 function defineInsert<TSchema, TParams, TTable, TReturning = never>(
   schema: DatabaseSchema<TSchema>,
-  queryBuilder: (
+  builder: (
     q: QueryBuilder<TSchema>,
     params: TParams,
     helpers: QueryHelpers,
   ) => Insertable<TTable> | InsertableWithReturning<TTable, TReturning>,
-  paramDefaults?: TParams,
-): InsertPlanHandle<TTable, TReturning, TParams>;
+  options?: ParseQueryOptions,
+):
+  | InsertPlanHandleInitial<TTable, TParams>
+  | InsertPlanHandleWithValues<TTable, TParams>
+  | InsertPlanHandleWithReturning<TReturning, TParams>;
 
 // SQL generation (from adapter packages)
 function toSql<TParams>(
-  plan: InsertPlanHandle<unknown, unknown, TParams>,
+  plan:
+    | InsertPlanHandleInitial<unknown, TParams>
+    | InsertPlanHandleWithValues<unknown, TParams>
+    | InsertPlanHandleWithReturning<unknown, TParams>,
   params: TParams,
-): { sql: string; params: TParams & Record<string, unknown> };
+): { sql: string; params: Record<string, unknown> };
 
 // Execution (from adapter packages)
-async function executeInsert<TTable, TReturning, TParams>(
+async function executeInsert<TSchema, TTable, TReturning, TParams>(
   db: PgDatabase | BetterSqlite3Database,
-  plan: InsertPlanHandle<TTable, TReturning, TParams>,
+  schema: DatabaseSchema<TSchema>,
+  builder: (
+    q: QueryBuilder<TSchema>,
+    params: TParams,
+    helpers?: QueryHelpers,
+  ) => Insertable<TTable> | InsertableWithReturning<TTable, TReturning>,
   params: TParams,
-  options?: ExecuteOptions,
+  options?: ExecuteOptions & ParseQueryOptions,
 ): Promise<TReturning extends never ? number : TReturning[]>;
 ```
 
@@ -231,7 +287,7 @@ Creates UPDATE query plans, generates SQL, or executes queries with optional RET
 // Plan definition (from @tinqerjs/tinqer)
 function defineUpdate<TSchema, TParams, TTable, TReturning = never>(
   schema: DatabaseSchema<TSchema>,
-  queryBuilder: (
+  builder: (
     q: QueryBuilder<TSchema>,
     params: TParams,
     helpers: QueryHelpers,
@@ -239,23 +295,53 @@ function defineUpdate<TSchema, TParams, TTable, TReturning = never>(
     | UpdatableWithSet<TTable>
     | UpdatableComplete<TTable>
     | UpdatableWithReturning<TTable, TReturning>,
-  paramDefaults?: TParams,
-): UpdatePlanHandle<TTable, TReturning, TParams>;
+  options?: ParseQueryOptions,
+):
+  | UpdatePlanHandleInitial<TTable, TParams>
+  | UpdatePlanHandleWithSet<TTable, TParams>
+  | UpdatePlanHandleComplete<TTable, TParams>
+  | UpdatePlanHandleWithReturning<TReturning, TParams>;
 
 // SQL generation (from adapter packages)
 function toSql<TParams>(
-  plan: UpdatePlanHandle<unknown, unknown, TParams>,
+  plan:
+    | UpdatePlanHandleWithSet<unknown, TParams>
+    | UpdatePlanHandleComplete<unknown, TParams>
+    | UpdatePlanHandleWithReturning<unknown, TParams>,
   params: TParams,
-): { sql: string; params: TParams & Record<string, unknown> };
+): { sql: string; params: Record<string, unknown> };
 
 // Execution (from adapter packages)
-async function executeUpdate<TTable, TReturning, TParams>(
+async function executeUpdate<TSchema, TTable, TReturning, TParams>(
   db: PgDatabase | BetterSqlite3Database,
-  plan: UpdatePlanHandle<TTable, TReturning, TParams>,
+  schema: DatabaseSchema<TSchema>,
+  builder: (
+    q: QueryBuilder<TSchema>,
+    params: TParams,
+    helpers?: QueryHelpers,
+  ) =>
+    | UpdatableWithSet<TTable>
+    | UpdatableComplete<TTable>
+    | UpdatableWithReturning<TTable, TReturning>,
   params: TParams,
-  options?: ExecuteOptions,
+  options?: ExecuteOptions & ParseQueryOptions,
 ): Promise<TReturning extends never ? number : TReturning[]>;
 ```
+
+**SET clause**
+
+`.set(...)` supports both direct assignments and column self-references:
+
+```typescript
+q.update("users").set({ status: "inactive" });
+
+q.update("users").set((u) => ({ viewCount: u.viewCount + 1 }));
+```
+
+Notes:
+
+- The lambda form must return an object literal.
+- `.set(...)` can only be called once per UPDATE.
 
 **Example - SQL Generation**
 
@@ -330,26 +416,31 @@ Creates DELETE query plans, generates SQL, or executes queries.
 // Plan definition (from @tinqerjs/tinqer)
 function defineDelete<TSchema, TParams>(
   schema: DatabaseSchema<TSchema>,
-  queryBuilder: (
+  builder: (
     q: QueryBuilder<TSchema>,
     params: TParams,
     helpers: QueryHelpers,
   ) => Deletable<unknown> | DeletableComplete<unknown>,
-  paramDefaults?: TParams,
-): DeletePlanHandle<TParams>;
+  options?: ParseQueryOptions,
+): DeletePlanHandleInitial<unknown, TParams> | DeletePlanHandleComplete<unknown, TParams>;
 
 // SQL generation (from adapter packages)
 function toSql<TParams>(
-  plan: DeletePlanHandle<TParams>,
+  plan: DeletePlanHandleInitial<unknown, TParams> | DeletePlanHandleComplete<unknown, TParams>,
   params: TParams,
-): { sql: string; params: TParams & Record<string, unknown> };
+): { sql: string; params: Record<string, unknown> };
 
 // Execution (from adapter packages)
-async function executeDelete<TParams>(
+async function executeDelete<TSchema, TParams>(
   db: PgDatabase | BetterSqlite3Database,
-  plan: DeletePlanHandle<TParams>,
+  schema: DatabaseSchema<TSchema>,
+  builder: (
+    q: QueryBuilder<TSchema>,
+    params: TParams,
+    helpers?: QueryHelpers,
+  ) => Deletable<unknown> | DeletableComplete<unknown>,
   params: TParams,
-  options?: ExecuteOptions,
+  options?: ExecuteOptions & ParseQueryOptions,
 ): Promise<number>;
 ```
 
@@ -511,19 +602,27 @@ const result = toSql(
 
 Helpers expose the following functions that adapt per database dialect:
 
-- `ilike(field, pattern)` - Case-insensitive LIKE comparison
-- `contains(field, substring)` - Check if field contains substring (case-sensitive)
-- `icontains(field, substring)` - Check if field contains substring (case-insensitive)
-- `startsWith(field, prefix)` - Check if field starts with prefix (case-sensitive)
-- `istartsWith(field, prefix)` - Check if field starts with prefix (case-insensitive)
-- `endsWith(field, suffix)` - Check if field ends with suffix (case-sensitive)
-- `iendsWith(field, suffix)` - Check if field ends with suffix (case-insensitive)
+- `helpers.functions.iequals(a, b)` - Case-insensitive equality
+- `helpers.functions.istartsWith(str, prefix)` - Case-insensitive startsWith
+- `helpers.functions.iendsWith(str, suffix)` - Case-insensitive endsWith
+- `helpers.functions.icontains(str, substring)` - Case-insensitive contains
 
-**Creating Custom Helpers**
+**Window Functions**
 
-You can create helpers with custom functions:
+Helpers also include a window-function builder:
+
+- `helpers.window(row).partitionBy(...).orderBy(...).rowNumber()`
+- `helpers.window(row).partitionBy(...).orderByDescending(...).rank()`
+- `helpers.window(row).denseRank()`
+
+These are parsed into SQL window functions (they should never run at runtime).
+
+**createQueryHelpers**
+
+You usually do not need to call this directly (adapters provide helpers automatically), but it is exported for custom integrations:
 
 ```typescript
-const helpers = createQueryHelpers<Schema>();
-// Use helpers in your queries through the third parameter
+import { createQueryHelpers } from "@tinqerjs/tinqer";
+
+const helpers = createQueryHelpers();
 ```

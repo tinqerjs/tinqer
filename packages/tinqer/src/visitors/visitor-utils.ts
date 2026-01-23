@@ -41,18 +41,18 @@ export function getReturnExpression(statements: Statement[]): ASTExpression | nu
 export function isBooleanExpression(expr: Expression): expr is BooleanExpression {
   if (!expr) return false;
 
-  const booleanTypes = [
+  return [
     "comparison",
     "logical",
-    "negation",
+    "not",
     "in",
-    "booleanLiteral",
+    "booleanConstant",
     "booleanColumn",
+    "booleanParam",
+    "booleanMethod",
+    "caseInsensitiveFunction",
     "isNull",
-    "isNotNull",
-  ];
-
-  return booleanTypes.includes(expr.type);
+  ].includes(expr.type);
 }
 
 /**
@@ -61,17 +61,19 @@ export function isBooleanExpression(expr: Expression): expr is BooleanExpression
 export function isValueExpression(expr: Expression): expr is ValueExpression {
   if (!expr) return false;
 
-  const valueTypes = [
-    "literal",
+  return [
     "column",
-    "parameter",
+    "excludedColumn",
+    "constant",
+    "param",
     "arithmetic",
     "concat",
-    "conditional",
-    "object",
-    "array",
-    "call",
-  ];
-
-  return valueTypes.includes(expr.type);
+    "stringMethod",
+    "case",
+    "coalesce",
+    "aggregate",
+    "windowFunction",
+    "reference",
+    "allColumns",
+  ].includes(expr.type);
 }

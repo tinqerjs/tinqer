@@ -385,6 +385,16 @@ export async function executeSelect<
         }
         return false as ReturnType;
       }
+
+      case "contains": {
+        // Returns boolean
+        const containsResult = (await db.one(sql, sqlParams)) as Record<string, unknown>;
+        const containsKeys = Object.keys(containsResult);
+        if (containsKeys.length > 0 && containsKeys[0]) {
+          return (containsResult[containsKeys[0]] === 1) as ReturnType;
+        }
+        return false as ReturnType;
+      }
     }
   }
 

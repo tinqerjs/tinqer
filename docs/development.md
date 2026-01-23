@@ -35,11 +35,9 @@ Guide for contributing to Tinqer, running tests, and troubleshooting.
 
 ### 1.1 Prerequisites
 
-- Node.js 18+ (for ESM support)
-- npm 8+
-- TypeScript 5.3+
-- PostgreSQL 12+ (for PostgreSQL adapter development)
-- SQLite 3.35+ (for SQLite adapter development)
+- Node.js 22+ (required; see `package.json` `engines.node`)
+- npm (workspaces; typically bundled with Node)
+- Docker + Docker Compose (optional, for PostgreSQL integration tests via `devenv/docker-compose.yml`)
 
 ### 1.2 Installation
 
@@ -62,28 +60,39 @@ tinqer/
 ├── packages/
 │   ├── tinqer/                          # Core library
 │   │   ├── src/
-│   │   │   ├── parser/                  # Lambda expression parser (OXC)
-│   │   │   ├── converter/               # AST to expression tree converter
-│   │   │   ├── queryable/               # Queryable API
-│   │   │   ├── visitors/                # SQL generation visitors
-│   │   │   └── types/                   # TypeScript type definitions
+│   │   │   ├── expressions/             # Expression tree types
+│   │   │   ├── linq/                    # Public query DSL (Queryable/TerminalQuery)
+│   │   │   ├── parser/                  # Lambda parsing (OXC) + AST visitor
+│   │   │   ├── plans/                   # Plan handles (defineSelect/defineUpdate/etc.)
+│   │   │   ├── policies/                # Row filters / policy helpers
+│   │   │   ├── query-tree/              # Operation node types
+│   │   │   └── visitors/                # Operation visitors (AST -> query tree)
 │   │   └── tests/                       # Core library tests
 │   │
-│   ├── pg-promise-adapter/           # PostgreSQL adapter
+│   ├── pg-promise-adapter/              # PostgreSQL adapter (pg-promise)
 │   │   ├── src/
-│   │   │   ├── adapter.ts               # PostgreSQL SQL adapter
-│   │   │   ├── execute.ts               # Execution functions
-│   │   │   └── visitors/                # PostgreSQL-specific visitors
-│   │   └── tests/                       # Integration tests
+│   │   │   ├── generators/              # SQL clause generators (from/where/select/etc.)
+│   │   │   ├── expression-generator.ts  # Expression -> SQL generator
+│   │   │   ├── sql-generator.ts         # Operation tree -> SQL orchestrator
+│   │   │   └── index.ts                 # Public adapter API (execute*, toSql)
+│   │   └── tests/                       # Unit tests (SQL generation + runtime behavior)
 │   │
-│   ├── better-sqlite3-adapter/       # SQLite adapter
+│   ├── better-sqlite3-adapter/          # SQLite adapter (better-sqlite3)
 │   │   ├── src/
-│   │   │   ├── adapter.ts               # SQLite SQL adapter
-│   │   │   ├── execute.ts               # Execution functions
-│   │   │   └── visitors/                # SQLite-specific visitors
-│   │   └── tests/                       # Integration tests
+│   │   │   ├── generators/              # SQL clause generators (from/where/select/etc.)
+│   │   │   ├── expression-generator.ts  # Expression -> SQL generator
+│   │   │   ├── sql-generator.ts         # Operation tree -> SQL orchestrator
+│   │   │   └── index.ts                 # Public adapter API (execute*, toSql)
+│   │   └── tests/                       # Unit tests (SQL generation + runtime behavior)
 │   │
-│   └── tinqer-sql-*/                    # Integration test packages
+│   ├── pg-promise-adapter-integration/  # PostgreSQL integration tests (requires a running DB)
+│   │   └── tests/
+│   └── better-sqlite3-adapter-integration/ # SQLite integration tests
+│       └── tests/
+│
+├── devenv/                              # Local dev environment helpers
+│   ├── docker-compose.yml               # PostgreSQL for integration tests
+│   └── run.sh                           # Convenience wrapper around docker compose
 │
 ├── scripts/                             # Build and utility scripts
 │   ├── build.sh                         # Main build script
@@ -139,17 +148,21 @@ npm run build
 # Run all tests
 npm test
 
-# Run tests in watch mode
-npm run test:watch
+# Save full test output (gitignored)
+npm test | tee .tests/run-<timestamp>.txt
 
-# Run specific tests by pattern
-npm run test:grep -- "WHERE operations"
-npm run test:grep -- "INSERT"
-npm run test:grep -- "JOIN"
+# Run tests for a specific workspace
+npm test --workspace @tinqerjs/tinqer
+npm test --workspace @tinqerjs/pg-promise-adapter
+npm test --workspace @tinqerjs/better-sqlite3-adapter
+npm test --workspace @tinqerjs/better-sqlite3-adapter-integration
 
-# Run tests for specific package
-cd packages/tinqer
-npm test
+# Grep within a specific workspace (Mocha)
+npm test --workspace @tinqerjs/tinqer -- --grep "WHERE operations"
+
+# PostgreSQL integration tests (requires a running Postgres)
+./devenv/run.sh up
+TINQER_PG_INTEGRATION=1 npm test --workspace @tinqerjs/pg-promise-adapter-integration
 ```
 
 ### 3.2 Test Organization
@@ -157,11 +170,11 @@ npm test
 **Core Library Tests** (`packages/tinqer/tests/`):
 
 - Parser tests: Lambda expression parsing
-- Converter tests: AST to expression tree conversion
+- AST visitor tests: AST to expression tree conversion
 - Queryable tests: Query builder API
 - Type tests: TypeScript type inference
 
-**Integration Tests** (`packages/tinqer-sql-*/tests/`):
+**Integration Tests**:
 
 - PostgreSQL integration: `pg-promise-adapter-integration/tests/`
 - SQLite integration: `better-sqlite3-adapter-integration/tests/`
@@ -233,19 +246,15 @@ describe("PostgreSQL Integration", () => {
 
 **Test Database Setup:**
 
-PostgreSQL tests use shared connection (`packages/pg-promise-adapter-integration/tests/shared-db.ts`):
+PostgreSQL integration tests use a shared connection (`packages/pg-promise-adapter-integration/tests/shared-db.ts`):
 
 ```typescript
 import pgPromise from "pg-promise";
 
 const pgp = pgPromise();
-export const db = pgp({
-  host: "localhost",
-  port: 5432,
-  database: "tinqer_test",
-  user: "tinqer_test",
-  password: "tinqer_test",
-});
+const connectionString =
+  process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5432/tinqer_test";
+export const db = pgp(connectionString);
 ```
 
 SQLite tests use isolated in-memory databases:
@@ -322,10 +331,10 @@ npm run format
 
   ```typescript
   // Correct
-  import { Queryable } from "./queryable/queryable.js";
+  import { Queryable } from "./linq/queryable.js";
 
   // Incorrect
-  import { Queryable } from "./queryable/queryable";
+  import { Queryable } from "./linq/queryable";
   ```
 
 - **Pure functions**: Prefer stateless functions with explicit dependency injection
@@ -565,18 +574,18 @@ interface Schema {
 1. **Make changes** to source files
 2. **Run linter**: `./scripts/lint-all.sh --fix`
 3. **Build**: `./scripts/build.sh --no-format` (skip formatting for speed)
-4. **Run specific tests**: `npm run test:grep -- "your feature"`
+4. **Run specific tests**: `npm test --workspace @tinqerjs/tinqer -- --grep "your feature"`
 5. **Iterate** until tests pass
-6. **Run full test suite**: `npm test`
-7. **Format code**: `./scripts/format-all.sh`
-8. **Final build**: `./scripts/build.sh`
+6. **Run full test suite**: `npm test | tee .tests/run-<timestamp>.txt`
+7. **Format code**: `./scripts/format-all.sh` (or `./scripts/build.sh` without `--no-format`)
+8. **Final build**: `./scripts/build.sh` (lint-first: run `./scripts/lint-all.sh` before building)
 9. **Commit changes**
 
 **Debugging Tips:**
 
-- Use `npm run test:grep -- "pattern"` to focus on specific tests
+- Use `npm test --workspace <workspace> -- --grep "pattern"` to focus on specific tests
 - Check `.tests/` directory for saved test output (gitignored)
-- Use TypeScript's `tsc --noEmit` to check types without building
+- Use `npm run typecheck` to check types without building
 - Enable verbose logging in tests with `DEBUG=* npm test`
 
 ---

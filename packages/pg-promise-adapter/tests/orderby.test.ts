@@ -57,4 +57,36 @@ describe("ORDER BY SQL Generation", () => {
       'SELECT * FROM "products" ORDER BY "category" ASC, "rating" DESC, "price" ASC',
     );
   });
+
+  it("should support reverse() by flipping ORDER BY direction", () => {
+    const result = toSql(
+      defineSelect(schema, (q) =>
+        q
+          .from("users")
+          .orderBy((u) => u.name)
+          .reverse(),
+      ),
+      {},
+    );
+
+    expect(result.sql).to.equal('SELECT * FROM "users" ORDER BY "name" DESC');
+  });
+
+  it("should add default ORDER BY for reverse() without existing ORDER BY", () => {
+    const result = toSql(
+      defineSelect(schema, (q) => q.from("users").reverse()),
+      {},
+    );
+
+    expect(result.sql).to.equal('SELECT * FROM "users" ORDER BY 1 DESC');
+  });
+
+  it("should throw when reverse() is applied after take()", () => {
+    expect(() =>
+      toSql(
+        defineSelect(schema, (q) => q.from("users").take(10).reverse()),
+        {},
+      ),
+    ).to.throw(/reverse\(\) after take\/skip is not supported/);
+  });
 });

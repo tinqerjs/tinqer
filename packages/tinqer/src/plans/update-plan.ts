@@ -112,8 +112,26 @@ export interface UpdatePlanSql {
 export class UpdatePlanHandleInitial<TRecord, TParams> {
   constructor(private readonly state: UpdatePlanState<TRecord, TParams>) {}
 
-  set(values: Partial<TRecord>): UpdatePlanHandleWithSet<TRecord, TParams> {
-    const nextState = appendSet(this.state, values);
+  set(values: Partial<TRecord>): UpdatePlanHandleWithSet<TRecord, TParams>;
+  set(
+    valuesSelector: (row: TRecord) => Partial<TRecord>,
+  ): UpdatePlanHandleWithSet<TRecord, TParams>;
+  set<ExtraParams extends object = Record<string, never>>(
+    valuesSelector: (row: TRecord, params: TParams & ExtraParams) => Partial<TRecord>,
+  ): UpdatePlanHandleWithSet<TRecord, TParams & ExtraParams>;
+  set<ExtraParams extends object = Record<string, never>>(
+    values:
+      | Partial<TRecord>
+      | ((row: TRecord) => Partial<TRecord>)
+      | ((row: TRecord, params: TParams & ExtraParams) => Partial<TRecord>),
+  ): UpdatePlanHandleWithSet<TRecord, TParams | (TParams & ExtraParams)> {
+    const nextState = appendSet(
+      this.state,
+      values as unknown as
+        | Partial<TRecord>
+        | ((row: TRecord) => Partial<TRecord>)
+        | ((row: TRecord, params: TParams) => Partial<TRecord>),
+    );
     return new UpdatePlanHandleWithSet(nextState);
   }
 
@@ -339,23 +357,35 @@ export function defineUpdate(
 
 function appendSet<TRecord, TParams>(
   state: UpdatePlanState<TRecord, TParams>,
-  values: Partial<TRecord>,
+  values:
+    | Partial<TRecord>
+    | ((row: TRecord) => Partial<TRecord>)
+    | ((row: TRecord, params: TParams) => Partial<TRecord>),
 ): UpdatePlanState<TRecord, TParams> {
   const visitorContext = restoreVisitorContext(state.contextSnapshot);
 
-  // Create an object literal AST for direct values
-  const setExpression: ASTExpression = {
-    type: "ObjectExpression",
-    properties: Object.entries(values as Record<string, unknown>).map(([key, value]) => ({
-      type: "Property",
-      key: { type: "Identifier", name: key },
-      value: { type: "Literal", value },
-      kind: "init",
-      method: false,
-      shorthand: false,
-      computed: false,
-    })),
-  } as ASTExpression;
+  let setExpression: ASTExpression;
+
+  if (typeof values === "function") {
+    setExpression = parseLambdaExpression(
+      values as unknown as (...args: unknown[]) => unknown,
+      "set",
+    );
+  } else {
+    // Create an object literal AST for direct values
+    setExpression = {
+      type: "ObjectExpression",
+      properties: Object.entries(values as Record<string, unknown>).map(([key, value]) => ({
+        type: "Property",
+        key: { type: "Identifier", name: key },
+        value: { type: "Literal", value },
+        kind: "init",
+        method: false,
+        shorthand: false,
+        computed: false,
+      })),
+    } as ASTExpression;
+  }
 
   const call = createMethodCall("set", setExpression);
   const result = visitSetOperation(call, state.operation as UpdateOperation, visitorContext);

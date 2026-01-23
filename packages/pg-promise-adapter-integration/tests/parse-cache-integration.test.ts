@@ -489,32 +489,71 @@ describe("Parse Cache Integration Tests (PostgreSQL)", () => {
           .orderBy((u) => u.name)
           .take(10);
 
-      // Clear cache and measure time for first execution
-      clearParseCache();
-      await executeSelectSimple(dbClient, schema, testQuery);
+      // A deterministic "performance" check: verify we avoid re-parsing by hitting the cache,
+      // rather than relying on wall-clock timing (which is flaky under parallel test load).
+      const cache = parseCache as unknown as {
+        get: (key: string) => unknown;
+        set: (key: string, value: unknown) => void;
+      };
 
-      // Measure time for cached execution
-      const start2 = Date.now();
-      for (let i = 0; i < 100; i++) {
+      const originalGet = cache.get;
+      const originalSet = cache.set;
+
+      let getHits = 0;
+      let getMisses = 0;
+      let setCount = 0;
+
+      cache.get = (key) => {
+        const cached = originalGet.call(parseCache, key);
+        if (cached) {
+          getHits += 1;
+        } else {
+          getMisses += 1;
+        }
+        return cached;
+      };
+
+      cache.set = (key, value) => {
+        setCount += 1;
+        originalSet.call(parseCache, key, value);
+      };
+
+      try {
+        clearParseCache();
         await executeSelectSimple(dbClient, schema, testQuery);
+
+        expect(parseCache.size()).to.equal(1);
+        expect(getMisses).to.equal(1);
+        expect(setCount).to.equal(1);
+
+        const runs = 50;
+        for (let i = 0; i < runs; i++) {
+          await executeSelectSimple(dbClient, schema, testQuery);
+        }
+
+        expect(parseCache.size()).to.equal(1);
+        expect(getHits).to.equal(runs);
+        expect(getMisses).to.equal(1);
+        expect(setCount).to.equal(1);
+
+        // Now verify cache bypass via option
+        getHits = 0;
+        getMisses = 0;
+        setCount = 0;
+        clearParseCache();
+
+        for (let i = 0; i < runs; i++) {
+          await executeSelectSimple(dbClient, schema, testQuery, { cache: false });
+        }
+
+        expect(parseCache.size()).to.equal(0);
+        expect(getHits).to.equal(0);
+        expect(getMisses).to.equal(0);
+        expect(setCount).to.equal(0);
+      } finally {
+        cache.get = originalGet;
+        cache.set = originalSet;
       }
-      const time2 = Date.now() - start2;
-
-      // With cache, 100 executions should be faster than 100x first execution
-      // (This is a soft check - actual speedup depends on query complexity)
-      expect(parseCache.size()).to.equal(1);
-
-      // Clear cache and measure time for 100 uncached executions
-      clearParseCache();
-      const start3 = Date.now();
-      for (let i = 0; i < 100; i++) {
-        await executeSelectSimple(dbClient, schema, testQuery, { cache: false });
-      }
-      const time3 = Date.now() - start3;
-
-      // Cached executions should be faster than uncached
-      expect(time2).to.be.lessThan(time3);
-      expect(parseCache.size()).to.equal(0); // No caching with cache: false
     });
   });
 });

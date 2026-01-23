@@ -399,6 +399,11 @@ export function executeSelect<
       return toBoolean(boolRow ? extractFirstColumn(boolRow) : undefined) as ReturnType;
     }
 
+    case "contains": {
+      const boolRow = stmt.get(boundParams) as Record<string, unknown> | undefined;
+      return toBoolean(boolRow ? extractFirstColumn(boolRow) : undefined) as ReturnType;
+    }
+
     default:
       return stmt.all(boundParams) as ReturnType;
   }

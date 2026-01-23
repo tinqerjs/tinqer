@@ -7,6 +7,7 @@ import { strict as assert } from "assert";
 import { defineUpdate } from "@tinqerjs/tinqer";
 import { toSql } from "../dist/index.js";
 import { schema } from "./test-schema.js";
+import type { TestSchema } from "./test-schema.js";
 
 describe("UPDATE Statement Generation", () => {
   describe("Basic UPDATE", () => {
@@ -26,6 +27,68 @@ describe("UPDATE Statement Generation", () => {
         __p1: 31,
         __p2: 1,
       });
+    });
+
+    it("should generate UPDATE with set lambda referencing current values", () => {
+      const result = toSql(
+        defineUpdate(schema, (q) =>
+          q
+            .update("users")
+            .set((u) => ({ age: u.age + 1 }))
+            .where((u) => u.id === 1),
+        ),
+        {},
+      );
+
+      assert.equal(result.sql, `UPDATE "users" SET "age" = ("age" + $(__p1)) WHERE "id" = $(__p2)`);
+      assert.deepEqual(result.params, {
+        __p1: 1,
+        __p2: 1,
+      });
+    });
+
+    it("should allow external parameters in set lambda via builder params", () => {
+      const result = toSql(
+        defineUpdate(schema, (q, p: { inc: number; id: number }) =>
+          q
+            .update("users")
+            .set((u) => ({ age: u.age + p.inc }))
+            .where((u) => u.id === p.id),
+        ),
+        { inc: 2, id: 1 },
+      );
+
+      assert.equal(result.sql, `UPDATE "users" SET "age" = ("age" + $(inc)) WHERE "id" = $(id)`);
+      assert.deepEqual(result.params, { inc: 2, id: 1 });
+    });
+
+    it("should support set lambda when chaining from UpdatePlanHandleInitial", () => {
+      const base = defineUpdate(schema, (q) => q.update("users"));
+
+      const result = toSql(
+        base.set((u) => ({ age: u.age + 1 })).where((u) => u.id === 1),
+        {},
+      );
+
+      assert.equal(result.sql, `UPDATE "users" SET "age" = ("age" + $(__p1)) WHERE "id" = $(__p2)`);
+      assert.deepEqual(result.params, {
+        __p1: 1,
+        __p2: 1,
+      });
+    });
+
+    it("should allow external params parameter in plan-handle set lambda", () => {
+      const base = defineUpdate(schema, (q) => q.update("users"));
+
+      const result = toSql(
+        base
+          .set((u: TestSchema["users"], p: { inc: number }) => ({ age: u.age + p.inc }))
+          .where((u: TestSchema["users"], p: { id: number }) => u.id === p.id),
+        { inc: 2, id: 1 },
+      );
+
+      assert.equal(result.sql, `UPDATE "users" SET "age" = ("age" + $(inc)) WHERE "id" = $(id)`);
+      assert.deepEqual(result.params, { inc: 2, id: 1 });
     });
 
     it("should generate UPDATE with multiple columns", () => {

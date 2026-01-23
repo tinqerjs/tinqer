@@ -439,6 +439,18 @@ const inactiveUsers = await executeUpdate(
   { cutoffDate: new Date("2023-01-01") },
 );
 
+// UPDATE with column self-reference (increment counters, etc.)
+await executeUpdate(
+  db,
+  schema,
+  (q, params: { userId: number }) =>
+    q
+      .update("users")
+      .set((u) => ({ view_count: u.view_count + 1 }))
+      .where((u) => u.id === params.userId),
+  { userId: 1 },
+);
+
 // Tip: undefined values in .set() or .values() are ignored; explicit null sets NULL.
 
 // DELETE
@@ -485,10 +497,10 @@ import { createSchema } from "@tinqerjs/tinqer";
 const schema = createSchema<Schema>();
 
 const query = (q, params, helpers) =>
-  q.from("users").where((u) => helpers.contains(u.name, params.searchTerm)); // Case-insensitive substring match
+  q.from("users").where((u) => helpers.functions.icontains(u.name, params.searchTerm)); // Case-insensitive substring match
 
-// PostgreSQL: WHERE u.name ILIKE $(searchTerm) (param: "%alice%")
-// SQLite: WHERE LOWER(u.name) LIKE LOWER(?) (param: "%alice%")
+// PostgreSQL: WHERE LOWER("name") LIKE '%' || LOWER($(searchTerm)) || '%'
+// SQLite: WHERE LOWER("name") LIKE '%' || LOWER(@searchTerm) || '%'
 ```
 
 ## Key Concepts
@@ -510,18 +522,18 @@ Tinqer supports a focused set of JavaScript/TypeScript expressions:
 - **String**: `.includes()`, `.startsWith()`, `.endsWith()`, `.toLowerCase()`, `.toUpperCase()`
 - **Null handling**: `??` (null coalescing), `?.` (optional chaining)
 - **Arrays**: `.includes()` for IN queries
-- **Helper functions**: `ilike()`, `contains()`, `startsWith()`, `endsWith()` (case-insensitive)
-- **Window functions**: `h.window(row).rowNumber()`, `h.window(row).rank()`, `h.window(row).denseRank()` with `partitionBy()`, `orderBy()`, `orderByDescending()`, `thenBy()`, `thenByDescending()`
+- **Helper functions**: `helpers.functions.iequals()`, `helpers.functions.istartsWith()`, `helpers.functions.iendsWith()`, `helpers.functions.icontains()` (portable case-insensitive)
+- **Window functions**: `helpers.window(row).partitionBy(...).orderBy(...).rowNumber()`, `helpers.window(row).rank()`, `helpers.window(row).denseRank()` with `orderByDescending()`, `thenBy()`, `thenByDescending()`
 
 ## Database Support
 
 ### PostgreSQL
 
 - Native boolean type (`true`/`false`)
-- Case-insensitive matching with `ILIKE`
+- Case-insensitive helpers use `LOWER()` comparisons for portable SQL
 - Full JSONB support
 - Window functions: `ROW_NUMBER()`, `RANK()`, `DENSE_RANK()`
-- Parameter placeholders: `$1`, `$2`, etc.
+- Parameter placeholders: `$(name)` / `$(__p1)` (pg-promise format)
 
 ### SQLite
 
@@ -529,7 +541,7 @@ Tinqer supports a focused set of JavaScript/TypeScript expressions:
 - Case-insensitive via `LOWER()` function
 - JSON functions support
 - Window functions: `ROW_NUMBER()`, `RANK()`, `DENSE_RANK()` (requires SQLite 3.25+)
-- Parameter placeholders: `?`, `?`, etc.
+- Parameter placeholders: `@name` / `@__p1`
 
 See [Database Adapters](docs/adapters.md) for detailed comparison.
 
