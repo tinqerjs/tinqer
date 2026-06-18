@@ -30,6 +30,7 @@ export function visitOrderByOperation(
     queryParams: Set<string>;
     autoParams: Map<string, unknown>;
     autoParamCounter: number;
+    helpersParam?: string;
   },
 ): { operation: OrderByOperation; autoParams: Record<string, unknown> } | null {
   // ORDER BY expects a lambda: orderBy(x => x.name)
@@ -49,6 +50,7 @@ export function visitOrderByOperation(
     visitorContext.tableParams,
     visitorContext.queryParams,
     visitorContext.autoParamCounter,
+    visitorContext.helpersParam,
   );
 
   // Add lambda parameter to context

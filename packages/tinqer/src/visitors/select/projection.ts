@@ -34,6 +34,7 @@ import type {
 import type { SelectContext } from "./context.js";
 import { createAutoParam } from "./context.js";
 import { isWindowFunctionCall, visitWindowFunction } from "../window/index.js";
+import { matchesFtsCallee, buildFtsRankExpression } from "../fts/index.js";
 import { isBooleanExpression, isValueExpression } from "../utils.js";
 
 /**
@@ -472,6 +473,11 @@ function visitMethodProjection(node: CallExpression, context: SelectContext): Ex
     const expressionVisitor = (node: ASTExpression, ctx: unknown) =>
       visitProjection(node, ctx as SelectContext);
     return visitWindowFunction(node, windowFunctionType, context, expressionVisitor);
+  }
+
+  // Check for full-text-search rank calls (h.fts.rank)
+  if (matchesFtsCallee(node, context.helpersParam, "rank")) {
+    return buildFtsRankExpression(node, (arg) => visitProjection(arg, context));
   }
 
   if (node.callee.type !== "MemberExpression") return null;

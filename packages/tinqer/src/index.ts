@@ -10,13 +10,21 @@ export { Queryable, OrderedQueryable } from "./linq/queryable.js";
 export { TerminalQuery } from "./linq/terminal-query.js";
 export { from } from "./linq/from.js";
 export { Grouping } from "./linq/grouping.js";
-export { DatabaseSchema, RowFilteredSchema, createSchema } from "./linq/database-context.js";
+export {
+  DatabaseSchema,
+  RowFilteredSchema,
+  FtsSchema,
+  createSchema,
+} from "./linq/database-context.js";
 export type {
   RowFilterOperation,
   RowFilterPredicate,
   TableRowFilters,
   RowFilterMap,
   RowFilterState,
+  FtsTableConfig,
+  FtsConfigMap,
+  FtsConfigState,
 } from "./linq/database-context.js";
 export {
   functions,
@@ -26,7 +34,13 @@ export {
   WindowBuilderWithOrder,
   WINDOW_MARKER,
 } from "./linq/functions.js";
-export type { QueryHelpers, WindowFunctionType, WindowOrderSpec } from "./linq/functions.js";
+export type {
+  QueryHelpers,
+  WindowFunctionType,
+  WindowOrderSpec,
+  FtsOptions,
+  FtsHelpers,
+} from "./linq/functions.js";
 export { createQueryBuilder } from "./linq/query-builder.js";
 export type { QueryBuilder } from "./linq/query-builder.js";
 
@@ -65,6 +79,7 @@ export type {
   CoalesceExpression,
   AggregateExpression,
   WindowFunctionExpression,
+  FtsRankExpression,
   ReferenceExpression,
   AllColumnsExpression,
 
@@ -77,8 +92,13 @@ export type {
   BooleanParameterExpression,
   BooleanMethodExpression,
   CaseInsensitiveFunctionExpression,
+  FtsMatchExpression,
   InExpression,
   IsNullExpression,
+
+  // Full-text-search shared types
+  FtsMode,
+  FtsIndexConfig,
 
   // Complex expressions
   MemberAccessExpression,

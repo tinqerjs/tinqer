@@ -16,6 +16,7 @@ Reference for adapter execution helpers, typed contexts, and query utilities.
   - [2.1 createSchema](#21-createschema)
   - [2.2 withRowFilters](#22-withrowfilters)
   - [2.3 withContext](#23-withcontext)
+  - [2.4 withFts](#24-withfts)
 - [3. Helper Utilities](#3-helper-utilities)
   - [3.1 createQueryHelpers](#31-createqueryhelpers)
 
@@ -572,6 +573,34 @@ const schema = rowFilteredSchema.withContext({ orgId: 7 });
 
 Once bound, you can pass the schema to `defineSelect` / `executeSelect` / `toSql` (and the UPDATE/DELETE equivalents) and the policy is applied automatically.
 
+### 2.4 withFts
+
+Declares full-text-search indexes per table, returning a schema on which the `helpers.fts.match` / `helpers.fts.rank` helpers can be used. Tinqer emits the query but creates no DDL — the backing objects (PostgreSQL `tsvector`/GIN index or SQLite FTS5 virtual table) are the developer's responsibility.
+
+```typescript
+import { createSchema } from "@tinqerjs/tinqer";
+
+interface Schema {
+  articles: { id: number; title: string; content: string; search_vector: string };
+}
+
+const schema = createSchema<Schema>().withFts({
+  articles: {
+    columns: ["title", "content"],
+    pg: { config: "english" /*, vector: "search_vector" */ },
+    sqlite: { table: "articles_fts" /*, key: "id" */ },
+  },
+});
+```
+
+Per-table config (`FtsTableConfig`):
+
+- `columns: string[]` — columns the index covers (PostgreSQL inline `to_tsvector` source and match default).
+- `pg?: { config?: string; vector?: string }` — text-search `config` (regconfig, default `"simple"`); set `vector` to a stored, GIN-indexed tsvector column to match/rank against it instead of inline `to_tsvector`.
+- `sqlite?: { table: string; key?: string }` — the FTS5 virtual `table`, and the base-table `key` aligned with its `rowid` (default `"rowid"`).
+
+Resolution happens at plan-finalize time; using `helpers.fts.*` on a table with no `withFts` entry throws. See [Full-Text Search](guide.md#17-full-text-search) for the full mapping and how to create the backing objects.
+
 ---
 
 ## 3. Helper Utilities
@@ -616,6 +645,15 @@ Helpers also include a window-function builder:
 - `helpers.window(row).denseRank()`
 
 These are parsed into SQL window functions (they should never run at runtime).
+
+**Full-Text Search**
+
+On schemas declared with [`withFts`](#24-withfts), helpers expose full-text search:
+
+- `helpers.fts.match(target, query, options?)` - boolean predicate for `where` (`tsvector @@ tsquery` on PostgreSQL, FTS5 `MATCH` on SQLite)
+- `helpers.fts.rank(target, query, options?)` - relevance score for `select` / `orderBy`, higher = more relevant (`ts_rank` on PostgreSQL, negated `bm25` on SQLite)
+
+`target` is the row (whole index), a column, or an array of columns. `options` is `{ mode?: "websearch" | "plain" | "phrase" | "raw"; config?: string }` (PostgreSQL only). Like the other helpers, these are parsed for SQL generation and never run at runtime.
 
 **createQueryHelpers**
 

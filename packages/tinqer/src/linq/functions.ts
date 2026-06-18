@@ -165,11 +165,49 @@ export const functions = {
   icontains,
 } as const;
 
+// ==================== Full-Text Search ====================
+
+/**
+ * Options for a full-text-search query.
+ */
+export interface FtsOptions {
+  /** How the query string is interpreted (default "websearch"). */
+  mode?: "websearch" | "plain" | "phrase" | "raw";
+  /** Text-search configuration (PostgreSQL regconfig, e.g. "english"); falls back to the schema's. */
+  config?: string;
+}
+
+/**
+ * Full-text-search helpers (helpers.fts.*). Like the other helpers, these are NEVER executed at
+ * runtime — they are parsed for SQL generation. Availability of the underlying FTS index/table is
+ * the developer's responsibility (Tinqer only emits the query that uses it).
+ */
+export interface FtsHelpers {
+  /** Whether `target` (a row or one of its text columns) matches the full-text `query`. */
+  match<T>(target: T, query: string, options?: FtsOptions): boolean;
+  /** The relevance score of `target` for `query` (higher = more relevant). */
+  rank<T>(target: T, query: string, options?: FtsOptions): number;
+}
+
+const fts: FtsHelpers = {
+  match<T>(_target: T, _query: string, _options?: FtsOptions): boolean {
+    throw new Error(
+      "This function should not be executed at runtime. It's parsed for SQL generation.",
+    );
+  },
+  rank<T>(_target: T, _query: string, _options?: FtsOptions): number {
+    throw new Error(
+      "This function should not be executed at runtime. It's parsed for SQL generation.",
+    );
+  },
+};
+
 /**
  * Helper object provided as second parameter to query lambdas
  */
 export interface QueryHelpers {
   functions: typeof functions;
+  fts: FtsHelpers;
   window<T>(row: T): WindowBuilder<T>;
 }
 
@@ -179,6 +217,7 @@ export interface QueryHelpers {
 export function createQueryHelpers(): QueryHelpers {
   return {
     functions,
+    fts,
     window<T>(_row: T): WindowBuilder<T> {
       return new WindowBuilder<T>();
     },

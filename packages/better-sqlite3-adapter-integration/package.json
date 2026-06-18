@@ -15,7 +15,7 @@
   "dependencies": {
     "@tinqerjs/tinqer": "file:../tinqer",
     "@tinqerjs/better-sqlite3-adapter": "file:../better-sqlite3-adapter",
-    "better-sqlite3": "^11.8.1"
+    "better-sqlite3": "^12.4.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",

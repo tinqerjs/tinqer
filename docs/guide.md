@@ -72,6 +72,12 @@ Complete reference for all query operations, parameters, and CRUD functionality 
   - [16.1 Basic Usage](#161-basic-usage)
   - [16.2 Per-Operation Filters](#162-per-operation-filters)
   - [16.3 Behavior Notes](#163-behavior-notes)
+- [17. Full-Text Search](#17-full-text-search)
+  - [17.1 Declaring an FTS Index](#171-declaring-an-fts-index)
+  - [17.2 Matching and Ranking](#172-matching-and-ranking)
+  - [17.3 Scoping Columns and Options](#173-scoping-columns-and-options)
+  - [17.4 Creating the Backing Index/Table](#174-creating-the-backing-indextable)
+  - [17.5 Behavior Notes](#175-behavior-notes)
 
 ---
 
@@ -2647,5 +2653,132 @@ const schemaWithPolicies = dangerousUnrestrictedSchema.withRowFilters<ScopeConte
 - Row-filtered schemas require `.withContext(...)` before SELECT/UPDATE/DELETE; otherwise query generation throws (fail closed).
 - For left joins, row filters are applied inside derived tables to preserve outer join semantics.
 - For updates, an additional safety predicate is applied so updates can’t “move” a row outside of the allowed filter scope via SET.
+
+## 17. Full-Text Search
+
+Tinqer can emit native full-text-search queries on both dialects. It is **opt-in per table** via `withFts`, and Tinqer only generates the query — you are responsible for the backing objects (a PostgreSQL `tsvector`/GIN index or an SQLite FTS5 virtual table). Ordinary `LIKE` / case-insensitive helpers remain available; FTS is purely additive.
+
+Two helpers are exposed on the query lambda's third (`helpers`) argument:
+
+- `helpers.fts.match(target, query, options?)` — a boolean predicate for `where`.
+- `helpers.fts.rank(target, query, options?)` — a relevance score (a value usable in `select` / `orderBy`). Higher is more relevant on **every** dialect.
+
+### 17.1 Declaring an FTS Index
+
+```typescript
+import { createSchema } from "@tinqerjs/tinqer";
+
+interface Schema {
+  articles: { id: number; title: string; content: string; search_vector: string };
+}
+
+const schema = createSchema<Schema>().withFts({
+  articles: {
+    // Columns the index covers (PostgreSQL inline to_tsvector source + match default).
+    columns: ["title", "content"],
+    // PostgreSQL: text-search config (regconfig, default "simple"); set `vector` to a stored,
+    // GIN-indexed tsvector column to match/rank against it instead of inline to_tsvector.
+    pg: { config: "english" /*, vector: "search_vector" */ },
+    // SQLite: the FTS5 virtual table, and the base-table key aligned with its rowid (default "rowid").
+    sqlite: { table: "articles_fts" /*, key: "id" */ },
+  },
+});
+```
+
+### 17.2 Matching and Ranking
+
+```typescript
+const results = await executeSelect(
+  db,
+  schema,
+  (q, p, h) =>
+    q
+      .from("articles")
+      .where((a) => h.fts.match(a, p.term))
+      .orderByDescending((a) => h.fts.rank(a, p.term))
+      .select((a) => ({ id: a.id, title: a.title, score: h.fts.rank(a, p.term) })),
+  { term: "graph databases" },
+);
+```
+
+PostgreSQL (inline `to_tsvector`):
+
+```sql
+SELECT "id" AS "id", "title" AS "title",
+       ts_rank(to_tsvector('english', coalesce("title", '') || ' ' || coalesce("content", '')),
+               websearch_to_tsquery('english', $(term))) AS "score"
+FROM "articles"
+WHERE to_tsvector('english', coalesce("title", '') || ' ' || coalesce("content", ''))
+      @@ websearch_to_tsquery('english', $(term))
+ORDER BY ts_rank(...) DESC
+```
+
+SQLite (FTS5 virtual table):
+
+```sql
+SELECT "id" AS "id", "title" AS "title",
+       (SELECT -bm25("articles_fts") FROM "articles_fts"
+        WHERE "articles_fts" MATCH @term AND "articles_fts"."rowid" = "articles"."rowid") AS "score"
+FROM "articles"
+WHERE "articles"."rowid" IN (SELECT "rowid" FROM "articles_fts" WHERE "articles_fts" MATCH @term)
+ORDER BY (SELECT -bm25("articles_fts") FROM "articles_fts" WHERE ...) DESC
+```
+
+`bm25` is lower-is-better, so Tinqer negates it — `rank` is uniformly higher-is-better across dialects.
+
+### 17.3 Scoping Columns and Options
+
+The first argument scopes the match/rank:
+
+- the row parameter (`a`) → the table's whole declared index.
+- a single column (`a.title`) → just that column.
+- an array (`[a.title, a.content]`) → those columns.
+
+Options interpret the query string on PostgreSQL:
+
+- `mode`: `"websearch"` (default), `"plain"`, `"phrase"`, or `"raw"` — selects `websearch_to_tsquery` / `plainto_tsquery` / `phraseto_tsquery` / `to_tsquery`.
+- `config`: a per-call regconfig override (e.g. `{ config: "simple" }`).
+
+```typescript
+q.from("articles").where((a) =>
+  h.fts.match(a.title, p.term, { mode: "phrase", config: "english" }),
+);
+```
+
+SQLite uses the FTS5 query string as-is (the `mode`/`config` options are PostgreSQL-specific); column scoping there is defined by the virtual table's own columns.
+
+### 17.4 Creating the Backing Index/Table
+
+Tinqer performs **no DDL** — create the backing objects yourself (e.g. in a migration).
+
+PostgreSQL, inline (no extra objects required, but add a GIN index for speed):
+
+```sql
+CREATE INDEX articles_fts_idx ON articles
+  USING GIN (to_tsvector('english', coalesce(title, '') || ' ' || coalesce(content, '')));
+```
+
+PostgreSQL, stored vector column (set `pg.vector: "search_vector"`):
+
+```sql
+ALTER TABLE articles ADD COLUMN search_vector tsvector
+  GENERATED ALWAYS AS (to_tsvector('english', coalesce(title, '') || ' ' || coalesce(content, ''))) STORED;
+CREATE INDEX articles_fts_idx ON articles USING GIN (search_vector);
+```
+
+SQLite, FTS5 external-content virtual table aligned with the base table's rowid:
+
+```sql
+CREATE VIRTUAL TABLE articles_fts USING fts5(title, content, content='articles', content_rowid='id');
+INSERT INTO articles_fts (rowid, title, content) SELECT id, title, content FROM articles;
+-- keep it in sync with triggers on insert/update/delete
+```
+
+### 17.5 Behavior Notes
+
+- FTS is resolved at plan-finalize time: using `helpers.fts.*` without a matching `withFts` entry for the source table throws (fail closed).
+- `match` is a boolean and composes with other `where` conditions via `&&` / `||`; `rank` is a value and composes in `select` / `orderBy`.
+- The query string is always a bound parameter — never string-interpolated — so it is injection-safe.
+- V1 targets the query's single source table; FTS is not resolved across joins.
 
 [← Back to README](../README.md)
