@@ -28,6 +28,9 @@ import type {
   CaseExpression,
   ReferenceExpression,
   WindowFunctionExpression,
+  FtsMatchExpression,
+  FtsRankExpression,
+  FtsIndexConfig,
 } from "@tinqerjs/tinqer";
 import type { SqlContext } from "./types.js";
 
@@ -91,6 +94,8 @@ export function generateBooleanExpression(expr: BooleanExpression, context: SqlC
       return generateBooleanMethodExpression(expr, context);
     case "caseInsensitiveFunction":
       return generateCaseInsensitiveFunctionExpression(expr, context);
+    case "ftsMatch":
+      return generateFtsMatchExpression(expr as FtsMatchExpression, context);
     case "in":
       return generateInExpression(expr as InExpression, context);
     case "isNull":
@@ -125,6 +130,8 @@ export function generateValueExpression(expr: ValueExpression, context: SqlConte
       return generateAggregateExpression(expr as AggregateExpression, context);
     case "windowFunction":
       return generateWindowFunctionExpression(expr as WindowFunctionExpression, context);
+    case "ftsRank":
+      return generateFtsRankExpression(expr as FtsRankExpression, context);
     case "coalesce":
       return generateCoalesceExpression(expr as CoalesceExpression, context);
     case "case":
@@ -723,6 +730,52 @@ function generateCaseInsensitiveFunctionExpression(
 }
 
 /**
+ * Resolve the SQLite FTS5 binding for an FTS expression (the base table, the virtual table, and the
+ * base-table key that aligns with the virtual table's rowid).
+ */
+function ftsSqliteConfig(index: FtsIndexConfig | undefined): {
+  base: string;
+  table: string;
+  key: string;
+} {
+  if (!index || !index.sqlite) {
+    throw new Error(
+      "Full-text-search was used without a SQLite FTS5 configuration. " +
+        'Add `sqlite: { table: "..." }` to the table\'s withFts(...) entry.',
+    );
+  }
+  return { base: index.table, table: index.sqlite.table, key: index.sqlite.key };
+}
+
+/**
+ * Generate SQL for a full-text-search match (boolean) against an FTS5 virtual table.
+ * Note: SQLite FTS5 has no per-call mode/config — the bound query string is used as-is and matching
+ * covers the virtual table's own columns (per-column scoping is a PostgreSQL-only feature here).
+ */
+function generateFtsMatchExpression(expr: FtsMatchExpression, context: SqlContext): string {
+  const fts = ftsSqliteConfig(expr.index);
+  const query = generateValueExpression(expr.query, context);
+  return (
+    `"${fts.base}"."${fts.key}" IN ` +
+    `(SELECT "rowid" FROM "${fts.table}" WHERE "${fts.table}" MATCH ${query})`
+  );
+}
+
+/**
+ * Generate SQL for a full-text-search rank (value) — a correlated `-bm25(...)` subquery so that
+ * higher = more relevant (bm25 is lower = better), uniform with the PostgreSQL adapter.
+ */
+function generateFtsRankExpression(expr: FtsRankExpression, context: SqlContext): string {
+  const fts = ftsSqliteConfig(expr.index);
+  const query = generateValueExpression(expr.query, context);
+  return (
+    `(SELECT -bm25("${fts.table}") FROM "${fts.table}" ` +
+    `WHERE "${fts.table}" MATCH ${query} ` +
+    `AND "${fts.table}"."rowid" = "${fts.base}"."${fts.key}")`
+  );
+}
+
+/**
  * Generate SQL for aggregate expressions
  */
 function generateAggregateExpression(expr: AggregateExpression, context: SqlContext): string {
@@ -868,6 +921,7 @@ function isBooleanExpression(expr: Expression): expr is BooleanExpression {
     "booleanColumn",
     "booleanConstant",
     "booleanMethod",
+    "ftsMatch",
     "exists",
   ].includes((expr as Expression & { type: string }).type);
 }
@@ -884,6 +938,7 @@ function isValueExpression(expr: Expression): expr is ValueExpression {
     "case",
     "aggregate",
     "windowFunction",
+    "ftsRank",
     "coalesce",
   ].includes((expr as Expression & { type: string }).type);
 }

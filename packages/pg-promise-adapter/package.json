@@ -1,6 +1,6 @@
 {
   "name": "@tinqerjs/pg-promise-adapter",
-  "version": "0.0.25",
+  "version": "0.0.27",
   "description": "pg-promise SQL generator for Tinqer query builder",
   "type": "module",
   "main": "./dist/index.js",
@@ -19,17 +19,17 @@
   },
   "dependencies": {},
   "peerDependencies": {
-    "@tinqerjs/tinqer": "^0.0.25"
+    "@tinqerjs/tinqer": "^0.0.27"
   },
   "devDependencies": {
-    "@types/chai": "5.2.2",
+    "@types/chai": "5.2.3",
     "@types/mocha": "10.0.10",
-    "@types/node": "24.3.3",
-    "@types/pg": "^8.11.10",
-    "chai": "5.3.3",
-    "mocha": "11.7.2",
-    "tsx": "4.20.5",
-    "typescript": "5.9.2"
+    "@types/node": "25.9.1",
+    "@types/pg": "^8.20.0",
+    "chai": "6.2.2",
+    "mocha": "11.7.6",
+    "tsx": "4.22.4",
+    "typescript": "6.0.3"
   },
   "keywords": [
     "tinqer",

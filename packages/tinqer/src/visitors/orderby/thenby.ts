@@ -28,6 +28,7 @@ export function visitThenByOperation(
     queryParams: Set<string>;
     autoParams: Map<string, unknown>;
     autoParamCounter: number;
+    helpersParam?: string;
   },
 ): { operation: ThenByOperation; autoParams: Record<string, unknown> } | null {
   // THEN BY expects a lambda: thenBy(x => x.age)
@@ -47,6 +48,7 @@ export function visitThenByOperation(
     visitorContext.tableParams,
     visitorContext.queryParams,
     visitorContext.autoParamCounter,
+    visitorContext.helpersParam,
   );
 
   // Add lambda parameter to context

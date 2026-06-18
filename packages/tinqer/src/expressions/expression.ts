@@ -125,6 +125,35 @@ export interface WindowFunctionExpression {
 }
 
 /**
+ * How a full-text-search query string is interpreted (mode).
+ */
+export type FtsMode = "websearch" | "plain" | "phrase" | "raw";
+
+/**
+ * A resolved full-text index for one table — attached to FTS expressions from the schema
+ * declaration at plan-finalize time, so SQL generation stays self-contained.
+ */
+export interface FtsIndexConfig {
+  table: string;
+  columns: string[];
+  pg?: { config?: string; vector?: string };
+  sqlite?: { table: string; key: string };
+}
+
+/**
+ * Full-text-search relevance score (helpers.fts.rank) — a value expression usable in
+ * SELECT / ORDER BY. Higher means more relevant on every dialect.
+ */
+export interface FtsRankExpression {
+  type: "ftsRank";
+  columns: string[]; // declared columns to score against; empty = the table's whole index
+  query: ValueExpression;
+  mode: FtsMode;
+  config?: string; // per-call text-search config override (PostgreSQL regconfig)
+  index?: FtsIndexConfig;
+}
+
+/**
  * Reference to an entire table/object (for JOIN result selectors)
  */
 export interface ReferenceExpression {
@@ -156,6 +185,7 @@ export type ValueExpression =
   | CoalesceExpression
   | AggregateExpression
   | WindowFunctionExpression
+  | FtsRankExpression
   | ReferenceExpression
   | AllColumnsExpression;
 
@@ -235,6 +265,18 @@ export interface CaseInsensitiveFunctionExpression {
 }
 
 /**
+ * Full-text-search MATCH (helpers.fts.match) — a boolean predicate.
+ */
+export interface FtsMatchExpression {
+  type: "ftsMatch";
+  columns: string[]; // declared columns to match; empty = the table's whole index
+  query: ValueExpression;
+  mode: FtsMode;
+  config?: string; // per-call text-search config override (PostgreSQL regconfig)
+  index?: FtsIndexConfig;
+}
+
+/**
  * IN expression - value in list
  */
 export interface InExpression {
@@ -264,6 +306,7 @@ export type BooleanExpression =
   | BooleanParameterExpression
   | BooleanMethodExpression
   | CaseInsensitiveFunctionExpression
+  | FtsMatchExpression
   | InExpression
   | IsNullExpression;
 
@@ -387,6 +430,7 @@ export function isValueExpression(expr: Expression): expr is ValueExpression {
     "coalesce",
     "aggregate",
     "windowFunction",
+    "ftsRank",
     "reference",
     "allColumns",
   ].includes(expr.type);
@@ -405,6 +449,7 @@ export function isBooleanExpression(expr: Expression): expr is BooleanExpression
     "booleanParam",
     "booleanMethod",
     "caseInsensitiveFunction",
+    "ftsMatch",
     "in",
     "isNull",
   ].includes(expr.type);

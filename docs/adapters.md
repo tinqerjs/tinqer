@@ -121,6 +121,7 @@ const { sql, params } = toSql(
 - RETURNING clauses are fully supported on INSERT, UPDATE, and DELETE through the execution helpers.
 - Parameter placeholders use the `$()` syntax expected by pg-promise (e.g., `$(minAge)`).
 - Window functions (`ROW_NUMBER()`, `RANK()`, `DENSE_RANK()`) are fully supported.
+- Full-text search (via [`withFts`](guide.md#17-full-text-search)) emits `tsvector @@ tsquery` for `helpers.fts.match` and `ts_rank(...)` for `helpers.fts.rank`. The vector is an inline `to_tsvector(config, …)` over the declared columns, or a stored, GIN-indexed column when `pg.vector` is set; `mode` selects the `*_tsquery` function (`websearch`/`plain`/`phrase`/`raw`). Create the GIN index yourself.
 
 ---
 
@@ -213,6 +214,7 @@ const rows = db.prepare(sql).all(params);
 - All parameters are passed as named values (e.g., `@__p1`, `@minAge`). The adapter converts booleans and dates to SQLite-friendly values automatically.
 - The execution helpers return row counts. SQLite currently ignores RETURNING clauses when running through the helpers; use a follow-up SELECT if you need inserted rows.
 - Window functions (`ROW_NUMBER()`, `RANK()`, `DENSE_RANK()`) require **SQLite 3.25 or later**.
+- Full-text search (via [`withFts`](guide.md#17-full-text-search)) targets an **FTS5 virtual table** you create (`sqlite.table`). `helpers.fts.match` emits `<key> IN (SELECT rowid FROM <fts> WHERE <fts> MATCH @q)`; `helpers.fts.rank` emits a correlated `-bm25(<fts>)` subquery (negated so higher = more relevant). The PostgreSQL-only `mode`/`config` options are ignored; the FTS5 query string is used as-is.
 
 ---
 

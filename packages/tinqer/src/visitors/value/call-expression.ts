@@ -31,6 +31,7 @@ import type { VisitorContext } from "../types.js";
 import { visitLiteral } from "../common/literal.js";
 import { isValueExpression, getParameterName, getReturnExpression } from "../utils.js";
 import { isWindowFunctionCall, visitWindowFunction } from "../window/index.js";
+import { matchesFtsCallee, buildFtsRankExpression } from "../fts/index.js";
 
 /**
  * Visit a call expression
@@ -44,6 +45,11 @@ export function visitCall(
   const windowFunctionType = isWindowFunctionCall(node, context);
   if (windowFunctionType) {
     return visitWindowFunction(node, windowFunctionType, context, visitExpression);
+  }
+
+  // Check for full-text-search rank calls (h.fts.rank)
+  if (matchesFtsCallee(node, context.helpersParam, "rank")) {
+    return buildFtsRankExpression(node, (arg) => visitExpression(arg, context));
   }
 
   // Must be a method call

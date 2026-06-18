@@ -44,7 +44,7 @@ export function visitLastOperation(
       }
 
       // Handle both Expression body and BlockStatement body
-      let bodyExpr: ASTExpression | null = null;
+      let bodyExpr: ASTExpression | null;
       if (arrowFunc.body.type === "BlockStatement") {
         // For block statements, look for a return statement
         bodyExpr = getReturnExpression(arrowFunc.body.body);

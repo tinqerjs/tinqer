@@ -2,7 +2,7 @@ import { Queryable } from "../linq/queryable.js";
 import { TerminalQuery } from "../linq/terminal-query.js";
 import type { QueryHelpers } from "../linq/functions.js";
 import type { QueryBuilder } from "../linq/query-builder.js";
-import type { DatabaseSchema, RowFilterState } from "../linq/database-context.js";
+import type { DatabaseSchema, RowFilterState, FtsConfigState } from "../linq/database-context.js";
 import type { Grouping } from "../linq/grouping.js";
 import type { ParseQueryOptions } from "../parser/types.js";
 import type { QueryOperation } from "../query-tree/operations.js";
@@ -43,6 +43,7 @@ import { visitMaxOperation } from "../visitors/aggregates/max.js";
 import { visitAnyOperation } from "../visitors/boolean-predicates/any.js";
 import { visitAllOperation } from "../visitors/boolean-predicates/all.js";
 import { applyRowFiltersToSelectOperation } from "../policies/row-filters.js";
+import { resolveFtsInSelectOperation } from "../policies/fts.js";
 
 // -----------------------------------------------------------------------------
 // Plan data
@@ -56,6 +57,7 @@ export interface SelectPlan<TRecord, TParams> {
   readonly contextSnapshot: VisitorContextSnapshot;
   readonly parseOptions?: ParseQueryOptions;
   readonly rowFilters?: RowFilterState;
+  readonly ftsConfig?: FtsConfigState;
   readonly __type?: {
     record: TRecord;
     params: TParams;
@@ -68,6 +70,7 @@ function createInitialState<TRecord, TParams>(
   parseResult: ParseResult,
   options?: ParseQueryOptions,
   rowFilters?: RowFilterState,
+  ftsConfig?: FtsConfigState,
 ): SelectPlanState<TRecord, TParams> {
   const operationClone = cloneOperationTree(parseResult.operation);
   return {
@@ -78,6 +81,7 @@ function createInitialState<TRecord, TParams>(
     contextSnapshot: parseResult.contextSnapshot,
     parseOptions: options,
     rowFilters,
+    ftsConfig,
   };
 }
 
@@ -103,6 +107,7 @@ function createState<TRecord, TParams>(
     contextSnapshot: nextSnapshot,
     parseOptions: base.parseOptions,
     rowFilters: base.rowFilters,
+    ftsConfig: base.ftsConfig,
   };
 }
 
@@ -130,7 +135,7 @@ export class SelectPlanHandle<TRecord, TParams> extends Queryable<TRecord> {
       this.state.contextSnapshot.autoParamCounter,
     );
     return {
-      operation: filtered.operation,
+      operation: resolveFtsInSelectOperation(filtered.operation, this.state.ftsConfig),
       params: filtered.params,
       autoParamInfos: this.state.autoParamInfos,
     };
@@ -333,7 +338,7 @@ export class SelectTerminalHandle<TResult, TParams> extends TerminalQuery<TResul
       this.state.contextSnapshot.autoParamCounter,
     );
     return {
-      operation: filtered.operation,
+      operation: resolveFtsInSelectOperation(filtered.operation, this.state.ftsConfig),
       params: filtered.params,
       autoParamInfos: this.state.autoParamInfos,
     };
@@ -413,7 +418,13 @@ export function defineSelect<
   }
 
   const rowFilters = schema.__tinqerRowFilters();
-  const initialState = createInitialState<unknown, TParams>(parseResult, options, rowFilters);
+  const ftsConfig = schema.__tinqerFtsConfig();
+  const initialState = createInitialState<unknown, TParams>(
+    parseResult,
+    options,
+    rowFilters,
+    ftsConfig,
+  );
 
   // Check if this is a terminal operation
   const isTerminal = [

@@ -406,6 +406,51 @@ const topEarners = await executeSelect(
 
 See the [Window Functions Guide](docs/guide.md#8-window-functions) for detailed examples of `RANK()`, `DENSE_RANK()`, complex ordering, and [filtering on window results](docs/guide.md#85-filtering-on-window-function-results).
 
+### Full-Text Search
+
+Opt into full-text search per table with `withFts`, then use the `helpers.fts.match` (a boolean predicate) and `helpers.fts.rank` (a relevance score, higher = more relevant) helpers. Tinqer only **emits** the query — you are responsible for the underlying FTS objects (a PostgreSQL `tsvector`/GIN index or an SQLite FTS5 virtual table). Plain `LIKE`/`icontains` stays available; FTS is purely additive.
+
+```typescript
+import { createSchema } from "@tinqerjs/tinqer";
+
+interface Schema {
+  articles: { id: number; title: string; content: string };
+}
+
+const schema = createSchema<Schema>().withFts({
+  // PostgreSQL: inline to_tsvector over these columns (or set pg.vector to a stored tsvector column).
+  // SQLite: matching/ranking happens through the FTS5 virtual table.
+  articles: {
+    columns: ["title", "content"],
+    pg: { config: "english" },
+    sqlite: { table: "articles_fts" },
+  },
+});
+
+const results = await executeSelect(
+  db,
+  schema,
+  (q, p, h) =>
+    q
+      .from("articles")
+      .where((a) => h.fts.match(a, p.term))
+      .orderByDescending((a) => h.fts.rank(a, p.term)),
+  { term: "graph databases" },
+);
+
+// PostgreSQL:
+//   WHERE to_tsvector('english', coalesce("title", '') || ' ' || coalesce("content", ''))
+//         @@ websearch_to_tsquery('english', $(term))
+//   ORDER BY ts_rank(...) DESC
+// SQLite:
+//   WHERE "articles"."rowid" IN (SELECT "rowid" FROM "articles_fts" WHERE "articles_fts" MATCH @term)
+//   ORDER BY (SELECT -bm25("articles_fts") FROM "articles_fts" WHERE ... ) DESC
+```
+
+The first argument scopes the match: the row (`a`) covers the table's whole index, a column (`a.title`) or array (`[a.title, a.content]`) restricts it. Options interpret the query string on PostgreSQL — `{ mode: "websearch" | "plain" | "phrase" | "raw" }` (default `websearch`) and `{ config: "english" }` (per-call regconfig override). SQLite uses the FTS5 query string as-is.
+
+See the [Full-Text Search Guide](docs/guide.md#17-full-text-search) for the full mapping, dialect differences, and how to create the backing index/table.
+
 ### CRUD Operations
 
 ```typescript
@@ -524,6 +569,7 @@ Tinqer supports a focused set of JavaScript/TypeScript expressions:
 - **Arrays**: `.includes()` for IN queries
 - **Helper functions**: `helpers.functions.iequals()`, `helpers.functions.istartsWith()`, `helpers.functions.iendsWith()`, `helpers.functions.icontains()` (portable case-insensitive)
 - **Window functions**: `helpers.window(row).partitionBy(...).orderBy(...).rowNumber()`, `helpers.window(row).rank()`, `helpers.window(row).denseRank()` with `orderByDescending()`, `thenBy()`, `thenByDescending()`
+- **Full-text search** (opt-in via `withFts`): `helpers.fts.match(target, query, options?)` (boolean), `helpers.fts.rank(target, query, options?)` (relevance score)
 
 ## Database Support
 
@@ -533,6 +579,7 @@ Tinqer supports a focused set of JavaScript/TypeScript expressions:
 - Case-insensitive helpers use `LOWER()` comparisons for portable SQL
 - Full JSONB support
 - Window functions: `ROW_NUMBER()`, `RANK()`, `DENSE_RANK()`
+- Full-text search: `tsvector @@ tsquery` matching (inline `to_tsvector` or a stored GIN-indexed column) and `ts_rank` scoring
 - Parameter placeholders: `$(name)` / `$(__p1)` (pg-promise format)
 
 ### SQLite
@@ -541,6 +588,7 @@ Tinqer supports a focused set of JavaScript/TypeScript expressions:
 - Case-insensitive via `LOWER()` function
 - JSON functions support
 - Window functions: `ROW_NUMBER()`, `RANK()`, `DENSE_RANK()` (requires SQLite 3.25+)
+- Full-text search: FTS5 virtual-table `MATCH` and `bm25()` scoring (negated so higher = more relevant)
 - Parameter placeholders: `@name` / `@__p1`
 
 See [Database Adapters](docs/adapters.md) for detailed comparison.

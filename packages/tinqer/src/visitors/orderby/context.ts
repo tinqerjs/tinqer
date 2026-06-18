@@ -16,6 +16,9 @@ export interface OrderByContext {
 
   // Current table being queried
   currentTable?: string;
+
+  // Helpers parameter name (h in (x, p, h) => ...), for full-text-search rank detection
+  helpersParam?: string;
 }
 
 /**
@@ -25,12 +28,14 @@ export function createOrderByContext(
   tableParams: Set<string>,
   queryParams: Set<string>,
   startCounter: number = 0,
+  helpersParam?: string,
 ): OrderByContext {
   return {
     tableParams: new Set(tableParams),
     queryParams: new Set(queryParams),
     autoParams: new Map(),
     autoParamCounter: startCounter,
+    helpersParam,
   };
 }
 

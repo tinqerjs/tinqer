@@ -23,6 +23,7 @@ import type {
 
 import type { OrderByContext } from "./context.js";
 import { createAutoParam } from "./context.js";
+import { matchesFtsCallee, buildFtsRankExpression } from "../fts/index.js";
 
 /**
  * Visit key selector expression for ORDER BY
@@ -225,6 +226,11 @@ function visitBinaryExpression(
  * Visit method call (e.g., x.name.toLowerCase())
  */
 function visitMethodCall(node: CallExpression, context: OrderByContext): ValueExpression | null {
+  // Full-text-search rank (h.fts.rank) as a sort key
+  if (matchesFtsCallee(node, context.helpersParam, "rank")) {
+    return buildFtsRankExpression(node, (arg) => visitKeySelector(arg, context));
+  }
+
   if (node.callee.type !== "MemberExpression") return null;
 
   const memberCallee = node.callee as MemberExpression;

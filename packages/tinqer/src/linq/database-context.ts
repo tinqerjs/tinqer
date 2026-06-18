@@ -28,6 +28,20 @@ export class DatabaseSchema<TSchema> {
   __tinqerRowFilters(): RowFilterState | undefined {
     return undefined;
   }
+
+  /**
+   * Declare full-text-search indexes per table. The developer is responsible for the underlying
+   * objects (a PostgreSQL `tsvector`/GIN or an SQLite FTS5 virtual table); Tinqer only emits the
+   * queries (`helpers.fts.match` / `helpers.fts.rank`) that use them.
+   */
+  withFts(configs: FtsConfigMap<TSchema>): FtsSchema<TSchema> {
+    return new FtsSchema(configs);
+  }
+
+  /** @internal */
+  __tinqerFtsConfig(): FtsConfigState | undefined {
+    return undefined;
+  }
 }
 
 /**
@@ -86,5 +100,40 @@ export class RowFilteredSchema<
       filters: this.filters as unknown as RowFilterState["filters"],
       context: this.context as unknown as RowFilterState["context"],
     };
+  }
+}
+
+// ==================== Full-Text Search config ====================
+
+/**
+ * A full-text index declared for one table. The developer guarantees the underlying objects exist;
+ * Tinqer only references them when generating SQL.
+ */
+export type FtsTableConfig = {
+  /** The text columns the index covers (PostgreSQL inline `to_tsvector` source + match defaults). */
+  columns: string[];
+  /** PostgreSQL: the text-search `config` (regconfig, default "simple"); set `vector` to the name of
+   *  a stored, GIN-indexed tsvector column to match/rank against it instead of inline `to_tsvector`. */
+  pg?: { config?: string; vector?: string };
+  /** SQLite: the FTS5 virtual `table`, and the base-table `key` joined to its `rowid` (default "rowid"). */
+  sqlite?: { table: string; key?: string };
+};
+
+export type FtsConfigMap<TSchema> = {
+  [K in keyof TSchema]?: FtsTableConfig;
+};
+
+export type FtsConfigState = {
+  configs: Record<string, FtsTableConfig>;
+};
+
+export class FtsSchema<TSchema> extends DatabaseSchema<TSchema> {
+  constructor(private readonly ftsConfigs: FtsConfigMap<TSchema>) {
+    super();
+  }
+
+  /** @internal */
+  override __tinqerFtsConfig(): FtsConfigState | undefined {
+    return { configs: this.ftsConfigs as unknown as FtsConfigState["configs"] };
   }
 }

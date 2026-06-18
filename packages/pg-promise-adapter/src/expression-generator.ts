@@ -28,6 +28,10 @@ import type {
   CaseExpression,
   ReferenceExpression,
   WindowFunctionExpression,
+  FtsMatchExpression,
+  FtsRankExpression,
+  FtsMode,
+  FtsIndexConfig,
 } from "@tinqerjs/tinqer";
 import type { SqlContext } from "./types.js";
 
@@ -91,6 +95,8 @@ export function generateBooleanExpression(expr: BooleanExpression, context: SqlC
       return generateBooleanMethodExpression(expr, context);
     case "caseInsensitiveFunction":
       return generateCaseInsensitiveFunctionExpression(expr, context);
+    case "ftsMatch":
+      return generateFtsMatchExpression(expr as FtsMatchExpression, context);
     case "in":
       return generateInExpression(expr as InExpression, context);
     case "isNull":
@@ -125,6 +131,8 @@ export function generateValueExpression(expr: ValueExpression, context: SqlConte
       return generateAggregateExpression(expr as AggregateExpression, context);
     case "windowFunction":
       return generateWindowFunctionExpression(expr as WindowFunctionExpression, context);
+    case "ftsRank":
+      return generateFtsRankExpression(expr as FtsRankExpression, context);
     case "coalesce":
       return generateCoalesceExpression(expr as CoalesceExpression, context);
     case "case":
@@ -727,6 +735,60 @@ function generateCaseInsensitiveFunctionExpression(
 }
 
 /**
+ * Map an FTS mode to its PostgreSQL `*_tsquery` function.
+ */
+function pgTsQueryFunction(mode: FtsMode): string {
+  switch (mode) {
+    case "websearch":
+      return "websearch_to_tsquery";
+    case "plain":
+      return "plainto_tsquery";
+    case "phrase":
+      return "phraseto_tsquery";
+    case "raw":
+      return "to_tsquery";
+  }
+}
+
+/**
+ * Build the PostgreSQL `tsvector` side of an FTS expression: a stored, GIN-indexed vector column
+ * when configured, otherwise an inline `to_tsvector` over the declared columns.
+ */
+function pgVectorSql(index: FtsIndexConfig, config: string): string {
+  if (index.pg?.vector) {
+    return `"${index.pg.vector}"`;
+  }
+  const source = index.columns.map((column) => `coalesce("${column}", '')`).join(" || ' ' || ");
+  return `to_tsvector('${config}', ${source})`;
+}
+
+/**
+ * Generate SQL for a full-text-search match (boolean) — `tsvector @@ tsquery`.
+ */
+function generateFtsMatchExpression(expr: FtsMatchExpression, context: SqlContext): string {
+  if (!expr.index) {
+    throw new Error("Full-text-search match was not resolved against a schema FTS configuration.");
+  }
+  const config = expr.config ?? expr.index.pg?.config ?? "simple";
+  const vector = pgVectorSql(expr.index, config);
+  const query = generateValueExpression(expr.query, context);
+  return `${vector} @@ ${pgTsQueryFunction(expr.mode)}('${config}', ${query})`;
+}
+
+/**
+ * Generate SQL for a full-text-search rank (value) — `ts_rank(...)` (higher = more relevant).
+ */
+function generateFtsRankExpression(expr: FtsRankExpression, context: SqlContext): string {
+  if (!expr.index) {
+    throw new Error("Full-text-search rank was not resolved against a schema FTS configuration.");
+  }
+  const config = expr.config ?? expr.index.pg?.config ?? "simple";
+  const vector = pgVectorSql(expr.index, config);
+  const query = generateValueExpression(expr.query, context);
+  return `ts_rank(${vector}, ${pgTsQueryFunction(expr.mode)}('${config}', ${query}))`;
+}
+
+/**
  * Generate SQL for aggregate expressions
  */
 function generateAggregateExpression(expr: AggregateExpression, context: SqlContext): string {
@@ -872,6 +934,7 @@ function isBooleanExpression(expr: Expression): expr is BooleanExpression {
     "booleanColumn",
     "booleanConstant",
     "booleanMethod",
+    "ftsMatch",
     "exists",
   ].includes((expr as Expression & { type: string }).type);
 }
@@ -888,6 +951,7 @@ function isValueExpression(expr: Expression): expr is ValueExpression {
     "case",
     "aggregate",
     "windowFunction",
+    "ftsRank",
     "coalesce",
   ].includes((expr as Expression & { type: string }).type);
 }

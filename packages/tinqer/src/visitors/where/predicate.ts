@@ -22,6 +22,7 @@ import { visitLogical } from "./logical.js";
 import { visitColumnAccess } from "./column.js";
 import { visitBooleanMethod } from "./boolean-method.js";
 import { visitCaseInsensitiveFunction } from "./case-insensitive-functions.js";
+import { visitFtsMatch } from "./fts.js";
 
 /**
  * Visit a predicate expression in WHERE context
@@ -99,6 +100,16 @@ export function visitPredicate(
     }
 
     case "CallExpression": {
+      // Try full-text-search match first (h.fts.match)
+      const ftsResult = visitFtsMatch(node as CallExpression, {
+        ...context,
+        autoParamCounter: currentCounter,
+      });
+
+      if (ftsResult.value) {
+        return ftsResult;
+      }
+
       // Try case-insensitive functions first (h.functions.iequals)
       const caseInsensitiveResult = visitCaseInsensitiveFunction(node as CallExpression, {
         ...context,
