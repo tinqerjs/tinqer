@@ -3,7 +3,7 @@
  */
 
 import { describe, it } from "mocha";
-import { strict as assert } from "assert";
+import { strict as assert } from "node:assert";
 import { parseQuery } from "../dist/parser/parse-query.js";
 import type { QueryBuilder } from "../dist/index.js";
 import type { InsertOperation, UpdateOperation, ParamRef } from "../dist/query-tree/operations.js";

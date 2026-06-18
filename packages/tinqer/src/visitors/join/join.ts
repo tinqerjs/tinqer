@@ -95,7 +95,7 @@ export function visitJoinOperation(
         predicateContext.add(innerParam);
 
         // Get predicate body
-        let bodyExpr: ASTExpression | null = null;
+        let bodyExpr: ASTExpression | null;
         if (predicateArrow.body.type === "BlockStatement") {
           bodyExpr = getReturnExpression(predicateArrow.body.body);
         } else {
@@ -238,7 +238,7 @@ export function visitJoinOperation(
       }
 
       // Handle both Expression body and BlockStatement body
-      let bodyExpr: ASTExpression | null = null;
+      let bodyExpr: ASTExpression | null;
       if (outerArrow.body.type === "BlockStatement") {
         // For block statements, look for a return statement
         bodyExpr = getReturnExpression(outerArrow.body.body);
@@ -290,7 +290,7 @@ export function visitJoinOperation(
       }
 
       // Handle both Expression body and BlockStatement body
-      let bodyExpr: ASTExpression | null = null;
+      let bodyExpr: ASTExpression | null;
       if (innerArrow.body.type === "BlockStatement") {
         // For block statements, look for a return statement
         bodyExpr = getReturnExpression(innerArrow.body.body);
@@ -394,7 +394,7 @@ export function visitJoinOperation(
       }
 
       // Convert the result selector body to an expression
-      let bodyExpr: ASTExpression | null = null;
+      let bodyExpr: ASTExpression | null;
       if (resultArrow.body.type === "BlockStatement") {
         bodyExpr = getReturnExpression(resultArrow.body.body);
       } else {

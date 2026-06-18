@@ -45,7 +45,7 @@ function parseResultSelector(
   const outerParam = (outerParamNode as Identifier).name;
   const groupParam = (groupParamNode as Identifier).name;
 
-  let bodyExpr: ASTExpression | null = null;
+  let bodyExpr: ASTExpression | null;
   if (resultSelectorAst.body.type === "BlockStatement") {
     bodyExpr = getReturnExpression(resultSelectorAst.body.body);
   } else {
@@ -177,7 +177,7 @@ export function visitGroupJoinOperation(
       outerContext.add(paramName);
     }
 
-    let bodyExpr: ASTExpression | null = null;
+    let bodyExpr: ASTExpression | null;
     if (outerArrow.body.type === "BlockStatement") {
       bodyExpr = getReturnExpression(outerArrow.body.body);
     } else {
@@ -209,7 +209,7 @@ export function visitGroupJoinOperation(
       innerContext.add(paramName);
     }
 
-    let bodyExpr: ASTExpression | null = null;
+    let bodyExpr: ASTExpression | null;
     if (innerArrow.body.type === "BlockStatement") {
       bodyExpr = getReturnExpression(innerArrow.body.body);
     } else {

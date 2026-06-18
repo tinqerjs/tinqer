@@ -61,7 +61,7 @@ export function visitDoUpdateSetOperation(
     return null;
   }
 
-  let assignmentsExpr: ObjectExpression | null = null;
+  let assignmentsExpr: ObjectExpression | null;
 
   if (firstArg.type === "ObjectExpression") {
     const expr = visitExpression(firstArg as ASTObjectExpression, visitorContext);

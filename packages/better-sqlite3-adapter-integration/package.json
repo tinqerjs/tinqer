@@ -8,23 +8,23 @@
     "test": "mocha tests/**/*.test.ts",
     "test:watch": "mocha tests/**/*.test.ts --watch",
     "test:grep": "mocha tests/**/*.test.ts --grep",
-    "test:build": "tsc --noEmit",
+    "test:build": "tsc -p tsconfig.test.json --noEmit",
     "lint": "eslint tests --ext .ts",
     "lint:fix": "eslint tests --ext .ts --fix"
   },
   "dependencies": {
     "@tinqerjs/tinqer": "file:../tinqer",
     "@tinqerjs/better-sqlite3-adapter": "file:../better-sqlite3-adapter",
-    "better-sqlite3": "^12.4.1"
+    "better-sqlite3": "^12.10.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
-    "@types/chai": "^5.2.2",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/chai": "^5.2.3",
     "@types/mocha": "^10.0.10",
-    "@types/node": "^24.3.3",
-    "chai": "^5.3.3",
-    "mocha": "^11.7.2",
-    "tsx": "^4.20.5",
-    "typescript": "^5.9.2"
+    "@types/node": "^25.9.1",
+    "chai": "^6.2.2",
+    "mocha": "^11.7.6",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
   }
 }

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, before, after, beforeEach } from "mocha";
-import { strict as assert } from "assert";
+import { strict as assert } from "node:assert";
 import { createSchema } from "@tinqerjs/tinqer";
 import { executeInsert } from "@tinqerjs/better-sqlite3-adapter";
 import Database from "better-sqlite3";

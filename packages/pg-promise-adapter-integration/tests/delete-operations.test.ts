@@ -3,7 +3,7 @@
  */
 
 import { describe, it, before, after, beforeEach } from "mocha";
-import { strict as assert } from "assert";
+import { strict as assert } from "node:assert";
 import { createSchema } from "@tinqerjs/tinqer";
 import { executeDelete } from "@tinqerjs/pg-promise-adapter";
 import { db as dbClient } from "./shared-db.js";
@@ -523,9 +523,10 @@ describe("DELETE Operations - PostgreSQL Integration", () => {
   describe("DELETE with cascading", () => {
     it("should cascade delete related records", async () => {
       // Delete a user that has orders (CASCADE should delete orders too)
-      const userOrdersBefore = await dbClient.any("SELECT * FROM test_orders WHERE user_id = $1", [
-        2,
-      ]);
+      const userOrdersBefore = await dbClient.any(
+        "SELECT * FROM test_orders WHERE user_id = $1",
+        [2],
+      );
       assert.equal(userOrdersBefore.length, 2); // john_doe has 2 orders
 
       const rowCount = await executeDelete(
@@ -538,9 +539,10 @@ describe("DELETE Operations - PostgreSQL Integration", () => {
       assert.equal(rowCount, 1);
 
       // Check that orders were also deleted
-      const userOrdersAfter = await dbClient.any("SELECT * FROM test_orders WHERE user_id = $1", [
-        2,
-      ]);
+      const userOrdersAfter = await dbClient.any(
+        "SELECT * FROM test_orders WHERE user_id = $1",
+        [2],
+      );
       assert.equal(userOrdersAfter.length, 0);
     });
   });

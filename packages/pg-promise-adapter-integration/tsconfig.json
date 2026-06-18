@@ -1,10 +1,9 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "./",
-    "outDir": "./dist"
+    "rootDir": "./"
   },
-  "include": ["src/**/*", "tests/**/*"],
+  "include": ["tests/**/*"],
   "exclude": ["node_modules", "dist"],
   "ts-node": {
     "esm": true,

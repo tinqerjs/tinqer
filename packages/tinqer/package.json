@@ -20,18 +20,18 @@
     "lint:fix": "eslint src tests --ext .ts --fix"
   },
   "dependencies": {
-    "oxc-parser": "0.108.0"
+    "oxc-parser": "0.134.0"
   },
   "devDependencies": {
-    "@types/chai": "5.2.2",
-    "@types/estree": "^1.0.8",
+    "@types/chai": "5.2.3",
+    "@types/estree": "^1.0.9",
     "@types/mocha": "10.0.10",
-    "@types/node": "24.3.3",
-    "chai": "5.3.3",
-    "mocha": "11.7.2",
+    "@types/node": "25.9.1",
+    "chai": "6.2.2",
+    "mocha": "11.7.6",
     "ts-node": "^10.9.2",
-    "tsx": "4.20.5",
-    "typescript": "5.9.2"
+    "tsx": "4.22.4",
+    "typescript": "6.0.3"
   },
   "keywords": [
     "linq",

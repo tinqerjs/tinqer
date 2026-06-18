@@ -511,7 +511,7 @@ export function executeInsert<
       error instanceof Error &&
       error.message === "Failed to parse insert builder or not an insert operation"
     ) {
-      throw new Error("Failed to parse INSERT query or not an insert operation");
+      throw new Error("Failed to parse INSERT query or not an insert operation", { cause: error });
     }
     throw error;
   }
@@ -612,7 +612,7 @@ export function executeUpdate<
       error instanceof Error &&
       error.message === "Failed to parse update builder or not an update operation"
     ) {
-      throw new Error("Failed to parse UPDATE query or not an update operation");
+      throw new Error("Failed to parse UPDATE query or not an update operation", { cause: error });
     }
     throw error;
   }
