@@ -35,11 +35,26 @@ Guide for contributing to Tinqer, running tests, and troubleshooting.
 
 ### 1.1 Prerequisites
 
-- Node.js 22+ (required; see `package.json` `engines.node`)
-- npm (workspaces; typically bundled with Node)
+- Node.js 22.13+ in the 22.x line, or Node.js 24+ (Node.js 26 is used for verification)
+- npm 11.19+ (workspaces, release-age filtering and version-pinned install-script approvals)
 - Docker + Docker Compose (optional, for PostgreSQL integration tests via `devenv/docker-compose.yml`)
 
 ### 1.2 Installation
+
+Both the library and documentation site enforce a seven-day minimum npm release
+age through their project `.npmrc`. Strict engine checks reject npm versions
+that cannot enforce the policy. Keep these safeguards enabled when refreshing
+dependencies. The library approves native setup scripts only for the exact
+reviewed `better-sqlite3` and `esbuild` versions in `package.json`; review and
+update those pins when upgrading either dependency.
+
+All workspaces compile tests with TypeScript 6 into their ignored `.tests/`
+directory and run that JavaScript in Mocha against the current `dist/` build.
+Query tests inspect callback source, so an alternative runtime transpiler can
+change the behavior being tested. `npm test` compiles the tests before running;
+`npm run build` checks both source and tests under the strict project settings.
+Rebuild the library after source changes. For continuous test editing, run
+`npm run test:build -- --watch` in the package alongside `npm run test:watch`.
 
 ```bash
 # Clone the repository

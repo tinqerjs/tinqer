@@ -1,9 +1,8 @@
 {
-  "loader": "ts-node/esm",
-  "spec": ["tests/**/*.test.ts"],
+  "spec": [".tests/**/*.test.js"],
   "recursive": true,
-  "extension": ["ts"],
-  "node-option": ["loader=ts-node/esm", "no-warnings"],
+  "extension": ["js"],
+  "node-option": ["enable-source-maps"],
   "timeout": 10000,
   "reporter": "spec"
 }

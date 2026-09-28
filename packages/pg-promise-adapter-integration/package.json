@@ -5,25 +5,25 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "mocha tests/**/*.test.ts",
-    "test:watch": "mocha tests/**/*.test.ts --watch",
-    "test:grep": "mocha tests/**/*.test.ts --grep",
-    "test:build": "tsc -p tsconfig.test.json --noEmit",
+    "test": "npm run test:build && mocha",
+    "test:watch": "npm test -- --watch",
+    "test:grep": "npm test -- --grep",
+    "test:build": "bash ../../scripts/build-tests.sh",
     "lint": "eslint tests --ext .ts",
     "lint:fix": "eslint tests --ext .ts --fix"
   },
   "dependencies": {
     "@tinqerjs/tinqer": "file:../tinqer",
     "@tinqerjs/pg-promise-adapter": "file:../pg-promise-adapter",
-    "pg-promise": "^12.6.2"
+    "pg-promise": "^12.7.1"
   },
   "devDependencies": {
     "@types/chai": "^5.2.3",
     "@types/mocha": "^10.0.10",
-    "@types/node": "^25.9.1",
+    "@types/node": "^26.6.2",
     "chai": "^6.2.2",
-    "mocha": "^11.7.6",
-    "tsx": "^4.22.4",
+    "mocha": "^12.0.2",
+    "tsx": "^4.23.15",
     "typescript": "^6.0.3"
   }
 }

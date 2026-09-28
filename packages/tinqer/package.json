@@ -11,26 +11,25 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "mocha --exit",
-    "test:grep": "mocha --exit --grep",
-    "test:build": "tsc -p tsconfig.test.json --noEmit",
+    "test": "npm run test:build && mocha --exit",
+    "test:grep": "npm test -- --grep",
+    "test:build": "bash ../../scripts/build-tests.sh",
     "dev": "tsx watch src/index.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests --ext .ts",
     "lint:fix": "eslint src tests --ext .ts --fix"
   },
   "dependencies": {
-    "oxc-parser": "0.134.0"
+    "oxc-parser": "0.150.0"
   },
   "devDependencies": {
     "@types/chai": "5.2.3",
     "@types/estree": "^1.0.9",
     "@types/mocha": "10.0.10",
-    "@types/node": "25.9.1",
+    "@types/node": "26.6.2",
     "chai": "6.2.2",
-    "mocha": "11.7.6",
-    "ts-node": "^10.9.2",
-    "tsx": "4.22.4",
+    "mocha": "12.0.2",
+    "tsx": "4.23.15",
     "typescript": "6.0.3"
   },
   "keywords": [

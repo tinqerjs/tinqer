@@ -178,8 +178,7 @@ export class InsertPlanHandleWithConflictTarget<TRecord, TParams> {
   ): InsertPlanHandleWithValues<TRecord, TParams>;
   doUpdateSet(
     valuesOrSelector:
-      | Partial<TRecord>
-      | ((existing: TRecord, excluded: TRecord) => Partial<TRecord>),
+      Partial<TRecord> | ((existing: TRecord, excluded: TRecord) => Partial<TRecord>),
   ): InsertPlanHandleWithValues<TRecord, TParams> {
     const nextState = appendDoUpdateSet(
       this.state,
@@ -373,8 +372,7 @@ function appendDoNothing<TRecord, TParams>(
 function appendDoUpdateSet<TRecord, TParams>(
   state: InsertPlanState<TRecord, TParams>,
   valuesOrSelector:
-    | Record<string, unknown>
-    | ((existing: unknown, excluded: unknown) => Record<string, unknown>),
+    Record<string, unknown> | ((existing: unknown, excluded: unknown) => Record<string, unknown>),
 ): InsertPlanState<TRecord, TParams> {
   const visitorContext = restoreVisitorContext(state.contextSnapshot);
 

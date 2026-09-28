@@ -158,8 +158,7 @@ export class SelectPlanHandle<TRecord, TParams> extends Queryable<TRecord> {
   ): SelectPlanHandle<TRecord, TParams & ExtraParams>;
   where<ExtraParams extends object = Record<string, never>>(
     predicate:
-      | ((item: TRecord) => boolean)
-      | ((item: TRecord, params: TParams & ExtraParams) => boolean),
+      ((item: TRecord) => boolean) | ((item: TRecord, params: TParams & ExtraParams) => boolean),
   ): SelectPlanHandle<TRecord, TParams | (TParams & ExtraParams)> {
     const nextState = appendWhere(
       this.state,

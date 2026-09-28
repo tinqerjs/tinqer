@@ -1,8 +1,7 @@
 {
-  "loader": "ts-node/esm",
-  "node-option": ["loader=ts-node/esm", "no-warnings"],
-  "extension": ["ts"],
-  "spec": ["tests/hooks.ts", "tests/**/*.test.ts"],
+  "node-option": ["enable-source-maps"],
+  "extension": ["js"],
+  "spec": [".tests/hooks.js", ".tests/**/*.test.js"],
   "timeout": 10000,
   "reporter": "spec",
   "recursive": true

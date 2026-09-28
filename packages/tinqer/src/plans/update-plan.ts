@@ -158,8 +158,7 @@ export class UpdatePlanHandleWithSet<TRecord, TParams> {
   // Implementation
   where<ExtraParams extends object = Record<string, never>>(
     predicate:
-      | ((item: TRecord) => boolean)
-      | ((item: TRecord, params: TParams & ExtraParams) => boolean),
+      ((item: TRecord) => boolean) | ((item: TRecord, params: TParams & ExtraParams) => boolean),
   ): UpdatePlanHandleComplete<TRecord, TParams | (TParams & ExtraParams)> {
     const nextState = appendWhereUpdate(
       this.state,

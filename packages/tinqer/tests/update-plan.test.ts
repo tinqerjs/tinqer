@@ -5,10 +5,10 @@ import {
   UpdatePlanHandleInitial,
   UpdatePlanHandleWithSet,
   UpdatePlanHandleComplete,
-} from "../src/plans/update-plan.js";
-import { createSchema } from "../src/linq/database-context.js";
-import type { QueryBuilder } from "../src/linq/query-builder.js";
-import type { UpdateOperation } from "../src/query-tree/operations.js";
+} from "../dist/plans/update-plan.js";
+import { createSchema } from "../dist/linq/database-context.js";
+import type { QueryBuilder } from "../dist/linq/query-builder.js";
+import type { UpdateOperation } from "../dist/query-tree/operations.js";
 
 // Test schema
 interface TestSchema {

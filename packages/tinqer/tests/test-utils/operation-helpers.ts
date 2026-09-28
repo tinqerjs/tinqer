@@ -12,8 +12,8 @@ import type {
   TakeOperation,
   SkipOperation,
   GroupByOperation,
-} from "../../src/query-tree/operations.js";
-import type { ParseResult } from "../../src/parser/parse-query.js";
+} from "../../dist/query-tree/operations.js";
+import type { ParseResult } from "../../dist/parser/parse-query.js";
 
 /**
  * Extract operation from ParseResult
