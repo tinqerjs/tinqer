@@ -744,8 +744,7 @@ function rewriteExpression(
               (item) => rewriteExpression(item, ctxParamName, contextKeys) as ValueExpression,
             )
           : (rewriteExpression(expr.list as unknown as Expression, ctxParamName, contextKeys) as
-              | ArrayExpression
-              | ParameterExpression),
+              ArrayExpression | ParameterExpression),
       };
     }
 
@@ -1039,8 +1038,7 @@ function substituteUpdatedColumnsInPredicate(
           list: Array.isArray(expr.list)
             ? expr.list.map((item) => rewriteValue(item as ValueExpression))
             : (rewriteExpression(expr.list as unknown as Expression, undefined, new Set()) as
-                | ArrayExpression
-                | ParameterExpression),
+                ArrayExpression | ParameterExpression),
         };
       case "isNull":
         return {

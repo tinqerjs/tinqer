@@ -11,8 +11,8 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "mocha tests/**/*.test.ts",
-    "test:build": "tsc -p tsconfig.test.json --noEmit",
+    "test": "npm run test:build && mocha",
+    "test:build": "bash ../../scripts/build-tests.sh",
     "dev": "tsx watch src/index.ts",
     "lint": "eslint src tests --ext .ts",
     "lint:fix": "eslint src tests --ext .ts --fix"
@@ -24,11 +24,11 @@
   "devDependencies": {
     "@types/chai": "5.2.3",
     "@types/mocha": "10.0.10",
-    "@types/node": "25.9.1",
-    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "26.6.2",
+    "@types/better-sqlite3": "^9.6.0",
     "chai": "6.2.2",
-    "mocha": "11.7.6",
-    "tsx": "4.22.4",
+    "mocha": "12.0.2",
+    "tsx": "4.23.15",
     "typescript": "6.0.3"
   },
   "keywords": [

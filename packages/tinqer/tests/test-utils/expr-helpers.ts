@@ -10,7 +10,7 @@ import type {
   NotExpression,
   ArithmeticExpression,
   BooleanColumnExpression,
-} from "../../src/expressions/expression.js";
+} from "../../dist/expressions/expression.js";
 
 export const expr = {
   // Basic value expressions

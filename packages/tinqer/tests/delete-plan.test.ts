@@ -4,10 +4,10 @@ import {
   defineDelete,
   DeletePlanHandleInitial,
   DeletePlanHandleComplete,
-} from "../src/plans/delete-plan.js";
-import { createSchema } from "../src/linq/database-context.js";
-import type { QueryBuilder } from "../src/linq/query-builder.js";
-import type { DeleteOperation } from "../src/query-tree/operations.js";
+} from "../dist/plans/delete-plan.js";
+import { createSchema } from "../dist/linq/database-context.js";
+import type { QueryBuilder } from "../dist/linq/query-builder.js";
+import type { DeleteOperation } from "../dist/query-tree/operations.js";
 
 // Test schema
 interface TestSchema {

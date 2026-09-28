@@ -114,8 +114,7 @@ export class DeletePlanHandleInitial<TRecord, TParams> {
   // Implementation
   where<ExtraParams extends object = Record<string, never>>(
     predicate:
-      | ((item: TRecord) => boolean)
-      | ((item: TRecord, params: TParams & ExtraParams) => boolean),
+      ((item: TRecord) => boolean) | ((item: TRecord, params: TParams & ExtraParams) => boolean),
   ): DeletePlanHandleComplete<TRecord, TParams & ExtraParams> {
     const nextState = appendWhereDelete(
       this.state,

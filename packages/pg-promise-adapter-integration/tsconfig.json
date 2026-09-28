@@ -4,14 +4,5 @@
     "rootDir": "./"
   },
   "include": ["tests/**/*"],
-  "exclude": ["node_modules", "dist"],
-  "ts-node": {
-    "esm": true,
-    "experimentalSpecifierResolution": "node",
-    "transpileOnly": true,
-    "compilerOptions": {
-      "noUnusedLocals": false,
-      "noUnusedParameters": false
-    }
-  }
+  "exclude": ["node_modules", "dist"]
 }

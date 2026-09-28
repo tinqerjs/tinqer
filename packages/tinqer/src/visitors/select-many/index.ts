@@ -60,8 +60,7 @@ function parseCollectionSelector(arrow: ArrowFunctionExpression): {
   if (arrow.body.type === "BlockStatement") {
     const block = arrow.body as BlockStatement;
     const returnStmt = block.body.find((stmt: Statement) => stmt.type === "ReturnStatement") as
-      | { argument?: ASTExpression }
-      | undefined;
+      { argument?: ASTExpression } | undefined;
     if (!returnStmt || !returnStmt.argument) {
       return { sourceParam, info: null, bodyExpression: null };
     }
@@ -142,8 +141,7 @@ function parseResultSelector(
   if (arrow.body.type === "BlockStatement") {
     const block = arrow.body as BlockStatement;
     const returnStmt = block.body.find((stmt: Statement) => stmt.type === "ReturnStatement") as
-      | { argument?: ASTExpression }
-      | undefined;
+      { argument?: ASTExpression } | undefined;
     if (!returnStmt || !returnStmt.argument) {
       return null;
     }

@@ -4,9 +4,9 @@ import {
   setParseCacheConfig,
   getParseCacheConfig,
   clearParseCache,
-} from "../src/index.js";
-import type { QueryBuilder } from "../src/index.js";
-import { parseCache } from "../src/parser/parse-cache.js";
+} from "../dist/index.js";
+import type { QueryBuilder } from "../dist/index.js";
+import { parseCache } from "../dist/parser/parse-cache.js";
 
 // Test types
 type User = {

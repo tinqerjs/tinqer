@@ -483,8 +483,7 @@ export interface InsertOperation extends QueryOperation {
 }
 
 export type InsertOnConflictAction =
-  | { type: "nothing" }
-  | { type: "update"; assignments: ObjectExpression };
+  { type: "nothing" } | { type: "update"; assignments: ObjectExpression };
 
 export interface InsertOnConflictClause {
   target: string[]; // Column names
@@ -519,8 +518,4 @@ export interface DeleteOperation extends QueryOperation {
  * Union type for all operations
  */
 export type AnyQueryOperation =
-  | ChainableOperation
-  | TerminalOperation
-  | InsertOperation
-  | UpdateOperation
-  | DeleteOperation;
+  ChainableOperation | TerminalOperation | InsertOperation | UpdateOperation | DeleteOperation;

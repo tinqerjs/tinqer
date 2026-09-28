@@ -1,7 +1,7 @@
 import { describe, it } from "mocha";
 import { expect } from "chai";
-import { defineSelect, SelectPlanHandle } from "../src/plans/select-plan.js";
-import { createSchema } from "../src/linq/database-context.js";
+import { defineSelect, SelectPlanHandle } from "../dist/plans/select-plan.js";
+import { createSchema } from "../dist/linq/database-context.js";
 import type {
   QueryOperation,
   FromOperation,
@@ -13,7 +13,7 @@ import type {
   SkipOperation,
   GroupByOperation,
   DistinctOperation,
-} from "../src/query-tree/operations.js";
+} from "../dist/query-tree/operations.js";
 
 // Test schema
 interface TestSchema {

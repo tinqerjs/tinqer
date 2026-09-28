@@ -1,12 +1,12 @@
 import { describe, it } from "mocha";
 import { expect } from "chai";
-import { defineSelect } from "../src/plans/select-plan.js";
-import { defineInsert } from "../src/plans/insert-plan.js";
-import { defineUpdate } from "../src/plans/update-plan.js";
-import { defineDelete } from "../src/plans/delete-plan.js";
-import { createSchema } from "../src/linq/database-context.js";
-import type { QueryBuilder } from "../src/linq/query-builder.js";
-import type { SelectOperation } from "../src/query-tree/operations.js";
+import { defineSelect } from "../dist/plans/select-plan.js";
+import { defineInsert } from "../dist/plans/insert-plan.js";
+import { defineUpdate } from "../dist/plans/update-plan.js";
+import { defineDelete } from "../dist/plans/delete-plan.js";
+import { createSchema } from "../dist/linq/database-context.js";
+import type { QueryBuilder } from "../dist/linq/query-builder.js";
+import type { SelectOperation } from "../dist/query-tree/operations.js";
 
 // Test schema
 interface TestSchema {
